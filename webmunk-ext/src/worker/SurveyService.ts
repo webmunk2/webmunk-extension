@@ -74,11 +74,13 @@ export class SurveyService {
 
     const nextSurveyIndex = lastSurveyIndex + 1;
 
+    const additionalParams = await this.makeSearchParametersByAdsConfigs();
+
     if (nextSurveyIndex < surveys.length) {
       const surveyData = surveys[nextSurveyIndex];
       const newSurvey: SurveyItem = {
         name: surveyData.name,
-        url: `${surveyData.url}?PROLIFIC_PID=${prolificId}`,
+        url: `${surveyData.url}?PROLIFIC_PID=${prolificId}${additionalParams || ''}`,
       };
 
       if (!this.surveys.some((survey) => survey.url === newSurvey.url) &&
@@ -92,19 +94,57 @@ export class SurveyService {
     await chrome.storage.local.set({ surveys: this.surveys });
   }
 
-  private async saveParamsToStorage(params: Record<string, boolean>): Promise<void> {
+  private async saveParamsToStorage(params: Record<string, boolean | string>): Promise<void> {
     await chrome.storage.local.set({ personalizationConfigs: params });
   }
 
-  private extractQueryParams(url: string): Record<string, boolean> {
-    const params: Record<string, boolean> = {};
+  private async makeSearchParametersByAdsConfigs(): Promise<string | undefined> {
+    const specifiedItemResult = await chrome.storage.local.get('personalizationConfigs');
+    const specifiedItem = specifiedItemResult.personalizationConfigs || {};
+    const onlyInformation = specifiedItem['oi'];
+
+    if (!Object.keys(specifiedItem).length) return;
+
+    if (!onlyInformation) {
+      Object.keys(specifiedItem).forEach((key) => {
+        if (typeof specifiedItem[key] === 'boolean') {
+          delete specifiedItem[key];
+        }
+      });
+
+      specifiedItem['oi'] = false;
+    }
+
+    const result = Object.entries(specifiedItem)
+      .sort(([, valueA], [, valueB]) => {
+        const isBooleanA = typeof valueA === 'boolean';
+        const isBooleanB = typeof valueB === 'boolean';
+
+        if (isBooleanA && !isBooleanB) return -1;
+        if (!isBooleanA && isBooleanB) return 1;
+        return 0;
+      })
+      .map(([key, value]) => `${key}=${value}`)
+      .join('&');
+
+    return `&${result}`;
+  }
+
+  private extractQueryParams(url: string): Record<string, boolean | string> {
+    const params: Record<string, boolean | string> = {};
     const queryString = url.split('?')[1];
 
     if (queryString) {
       const urlParams = new URLSearchParams(queryString);
 
       urlParams.forEach((value, key) => {
-        params[key] = value.toLowerCase() === 'true';
+        if (value === 'true') {
+          params[key] = true;
+        } else if (value === 'false') {
+          params[key] = false;
+        } else {
+          params[key] = value;
+        }
       });
     }
 

@@ -170,7 +170,7 @@ export class AdPersonalizationWorker {
     }
   }
 
-  private async getConfig(key: string): Promise<boolean> {
+  private async getConfig(key: string): Promise<boolean | string> {
     const specifiedItemResult = await chrome.storage.local.get('personalizationConfigs');
     const specifiedItem = specifiedItemResult.personalizationConfigs || {};
 
