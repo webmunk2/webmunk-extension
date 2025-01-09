@@ -20,6 +20,8 @@ export class NotificationService {
   }
 
   private displayNotification(text: string): void {
+    if (document.getElementById('webmunk-notification')) return;
+
     const styles = document.createElement('style');
     styles.textContent = `
       @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap');
@@ -99,6 +101,7 @@ export class NotificationService {
     document.head.appendChild(styles);
     const wrapper = document.createElement('div');
     wrapper.classList.add('wrapper');
+    wrapper.id = 'webmunk-notification';
 
     const notificationContainer = document.createElement('div');
     notificationContainer.classList.add('notification-container');
