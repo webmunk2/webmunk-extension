@@ -48,12 +48,15 @@ export class Worker {
   }
 
   private async onModuleEvent(event: string, data: any): Promise<void> {
+    if (await this.isExtensionHasToBeRemoved()) {
+      await this.showRemoveExtensionNotification();
+      return;
+    };
+
     await this.middleware();
 
-    if (await this.isExtensionHasToBeRemoved()) return;
-
     await this.rudderStack.track(event, data);
-  }
+}
 
   private async isExtensionHasToBeRemoved(): Promise<boolean> {
     const result = await chrome.storage.local.get('removeModalShowed');

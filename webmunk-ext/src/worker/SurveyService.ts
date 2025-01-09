@@ -101,19 +101,8 @@ export class SurveyService {
   private async makeSearchParametersByAdsConfigs(): Promise<string | undefined> {
     const specifiedItemResult = await chrome.storage.local.get('personalizationConfigs');
     const specifiedItem = specifiedItemResult.personalizationConfigs || {};
-    const onlyInformation = specifiedItem['oi'];
 
     if (!Object.keys(specifiedItem).length) return;
-
-    if (!onlyInformation) {
-      Object.keys(specifiedItem).forEach((key) => {
-        if (typeof specifiedItem[key] === 'boolean') {
-          delete specifiedItem[key];
-        }
-      });
-
-      specifiedItem['oi'] = false;
-    }
 
     const result = Object.entries(specifiedItem)
       .sort(([, valueA], [, valueB]) => {
