@@ -18,25 +18,29 @@ export class RateService {
   }
 
   private showAdRatingNotification(): void {
+    if (document.getElementById('webmunk-notification')) return;
+
     const styles = document.createElement('style');
     styles.textContent = `
       @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap');
 
-      .wrapper {
+      .notification-wrapper {
         position: fixed;
         top: 0;
         left: 0;
         z-index: 10000;
 
+        display: flex;
+        justify-content: center;
+        align-items: center;
         width: 100%;
         height: 100%;
+
         pointer-events: none;
       }
 
       .notification-container {
         position: fixed;
-        top: 40%;
-        left: 40%;
         z-index: 10000;
 
         display: flex;
@@ -164,7 +168,9 @@ export class RateService {
 
     document.head.appendChild(styles);
     const wrapper = document.createElement('div');
-    wrapper.classList.add('wrapper');
+    wrapper.classList.add('notification-wrapper');
+    wrapper.id = 'webmunk-notification';
+
     const notificationContainer = document.createElement('div');
     notificationContainer.classList.add('notification-container');
 
@@ -199,7 +205,7 @@ export class RateService {
 
     notificationContainer.innerHTML = notificationContent;
     wrapper.appendChild(notificationContainer);
-    document.body.appendChild(wrapper);
+    document.documentElement.appendChild(wrapper);
 
     document.getElementById('close-button')!.addEventListener('click', () => {
       this.sendResponseToService('skip');
