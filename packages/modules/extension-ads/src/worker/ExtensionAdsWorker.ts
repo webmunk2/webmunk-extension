@@ -5,6 +5,7 @@ import { RateService } from './RateService.ts';
 // @ts-ignore
 import { v4 as uuidv4 } from 'uuid';
 import filtersData from './url-filter.json';
+import tabUrlFiltersData from './tab-url-filter.json';
 import cosmeticFilteringEngine from './cosmetic-filtering.js';
 import {
   domainFromHostname,
@@ -125,10 +126,13 @@ export class ExtensionAdsWorker {
 
       if (res.redirected) {
         result.redirected = true;
-        result.redirectedUrl = res.url;
+        result.redirectedUrl = res.url.replace(/\\+/g, '');
       } else {
         const match = (await res.text()).match(/document\.location\.replace\("(.*)"\)/);
-        if (match && match[1]) result.redirected = true, result.redirectedUrl = match[1];
+        if (match && match[1]) {
+          result.redirected = true;
+          result.redirectedUrl = match[1].replace(/\\+/g, '');
+        }
       }
     } catch (error) {
       console.warn(`Exception fetching for redirects ${url}`, error);
@@ -303,11 +307,19 @@ export class ExtensionAdsWorker {
     })
   }
 
+  private isdTabUrlNotValid(url: string): boolean {
+    const filters = tabUrlFiltersData.filters;
+
+    return filters.some((filter) => url.startsWith(filter));
+  }
+
   public async _onMessage_adContent(data: { meta: any; adsData: AdData[] }, from: { tab: { id: number; url: string } }): Promise<void> {
     const { id: tabId, url: tabUrl } = from.tab;
     const { meta, adsData } = data;
 
     if (!adsData.length) return;
+
+    if (this.isdTabUrlNotValid(tabUrl)) return;
 
     const results = await Promise.all(
       adsData.map(async (data) => await this.processAdData(data, tabUrl, null))
@@ -345,22 +357,31 @@ export class ExtensionAdsWorker {
     let trackedAd = this.tabData[tabId].ads.get(clickedUrl);
 
     // If not found, search all URLs in content
-    if (!trackedAd && adData?.content) {
-      const contentItem = adData.content.find((item) => {
-        const { href, src, redirectedUrl, initialUrl } = item;
-        const urlsToCheck = [href, src, redirectedUrl, initialUrl];
+    if (!trackedAd) {
+      const originAndHostname = this.getOriginAndPathFromUrl(clickedUrl);
 
-        return urlsToCheck.some((url) => url && this.tabData[tabId].ads.has(url));
+      const parentAd = Array.from(this.tabData[tabId].ads.values()).find((storedAd) => {
+        return storedAd.content.some((adUrl) => {
+          let storedOriginAndHostname = this.getOriginAndPathFromUrl(adUrl.href);
+
+          if (storedOriginAndHostname !== originAndHostname && adUrl.redirectedUrl) {
+            storedOriginAndHostname = this.getOriginAndPathFromUrl(adUrl.redirectedUrl);
+          }
+
+          return storedOriginAndHostname === originAndHostname;
+        });
       });
 
-      if (contentItem) {
-        const { href, src, redirectedUrl, initialUrl } = contentItem;
-        const urlsToCheck = [href, src, redirectedUrl, initialUrl];
-        trackedAd = this.tabData[tabId].ads.get(urlsToCheck.find((url) => url && this.tabData[tabId].ads.has(url))!);
-      }
+      if (parentAd) trackedAd = parentAd;
     }
 
     return trackedAd;
+  }
+
+  private getOriginAndPathFromUrl(url: string): string {
+    const urlObj = new URL(url);
+
+    return `${urlObj.origin}${urlObj.pathname}`;
   }
 
   public _onMessage_captureRegion(request: any, _from: chrome.runtime.MessageSender): any {

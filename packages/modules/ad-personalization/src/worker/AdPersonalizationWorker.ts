@@ -25,6 +25,10 @@ enum moduleEvents {
   AD_PERSONALIZATION = 'ad_personalization',
 }
 
+enum Url {
+  FACEBOOK = 'facebook.com'
+}
+
 export class AdPersonalizationWorker {
   private eventEmitter: any;
   private urlIndexes: { [key: string]: number } = {};
@@ -192,9 +196,13 @@ export class AdPersonalizationWorker {
 
       chrome.runtime.onMessage.addListener(messageListener);
 
-      chrome.tabs.create({ url: url }, (tab) => {
+      chrome.tabs.create({ url: url, active: false }, (tab) => {
         if (tab && tab.id) {
           createdTabId = tab.id;
+
+          if (url.includes(Url.FACEBOOK)) {
+            this.activateFacebookTab(createdTabId);
+          }
 
           chrome.tabs.onUpdated.addListener((tabId: number, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
             if (tabId === createdTabId && changeInfo.status === 'complete') {
@@ -208,4 +216,8 @@ export class AdPersonalizationWorker {
       });
     });
   }
+
+  private activateFacebookTab(tabId: number): void {
+    chrome.tabs.update(tabId, { active: true });
+  };
 }

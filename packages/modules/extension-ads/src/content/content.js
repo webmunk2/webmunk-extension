@@ -426,20 +426,26 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
 
           chrome.runtime.sendMessage({ action: this.getMainAppMgrName() + '.adContent', data: { meta, adsData: [frameData] } });
 
-          document.addEventListener('click', async (event) => {
-            if (document.body.getAttribute('data-click-processed') === 'true') return;
+          frameData.forEach(adElement => {
+            adElement.addEventListener('click', async (event) => {
+              if (adElement.getAttribute('data-click-processed') === 'true') return;
 
-            await document.body.setAttribute('data-click-processed', 'true');
+              adElement.setAttribute('data-click-processed', 'true');
 
-            const clickedUrl = event.target.tagName === 'A'
-              ? event.target.href
-              : event.target.closest('a')?.href;
+              const clickedUrl = event.target.tagName === 'A'
+                ? event.target.href
+                : event.target.closest('a')?.href;
 
-            const meta = this.extractMeta();
-            const adData = await this.extractAdData(this.frameId);
+              const meta = this.extractMeta();
+              const adData = await this.extractAdData(this.frameId);
 
-            await chrome.runtime.sendMessage({ action: this.getMainAppMgrName() + '.adClicked', data: { clickedUrl, meta, adData } });
-            await document.body.setAttribute('data-click-processed', 'false');
+              await chrome.runtime.sendMessage({
+                action: this.getMainAppMgrName() + '.adClicked',
+                data: { clickedUrl, meta, adData }
+              });
+
+              adElement.setAttribute('data-click-processed', 'false');
+            });
           });
         });
 
@@ -451,7 +457,7 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
         document.addEventListener('DOMContentLoaded', async (event) => {
           await this.wait(WAIT_BEFORE_EXTRACT);
 
-          const elements =  document.querySelectorAll('[data-webmunk-isad]');
+          const elements = document.querySelectorAll('[data-webmunk-isad]');
           elements.forEach(elem => elem.localName !== 'iframe' && adElements.push(elem));
 
           const meta = this.extractMeta();
@@ -460,21 +466,22 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
           chrome.runtime.sendMessage({ action: this.getMainAppMgrName() + '.adContent', data: { meta, adsData } });
 
           this.initialAdContentSent = true;
-        });
 
-        document.addEventListener('click', async (event) => {
-          const adElement = adElements.find((elt) => elt === event.target || elt.contains(event.target));
+          adElements.forEach(adElement => {
+            adElement.addEventListener('click', async (event) => {
+              const clickedUrl = event.target.tagName === 'A'
+                ? event.target.href
+                : event.target.closest('a')?.href;
 
-          if (!adElement) return;
+              const meta = this.extractMeta();
+              const adData = await this.extractAdData(0, adElement);
 
-          const clickedUrl = event.target.tagName === 'A'
-            ? event.target.href
-            : event.target.closest('a')?.href;
-
-          const meta = this.extractMeta();
-          const adData = await this.extractAdData(0, adElement);
-
-          chrome.runtime.sendMessage({ action: this.getMainAppMgrName() + '.adClicked', data: { clickedUrl, meta, adData } });
+              chrome.runtime.sendMessage({
+                action: this.getMainAppMgrName() + '.adClicked',
+                data: { clickedUrl, meta, adData }
+              });
+            });
+          });
         });
 
         window.addEventListener('message', async (event) => {

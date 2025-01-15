@@ -18,7 +18,7 @@ export class RateService {
   }
 
   private showAdRatingNotification(): void {
-    if (document.getElementById('webmunk-notification')) return;
+    if (document.getElementById('webmunk-rate-notification')) return;
 
     const styles = document.createElement('style');
     styles.textContent = `
@@ -169,7 +169,7 @@ export class RateService {
     document.head.appendChild(styles);
     const wrapper = document.createElement('div');
     wrapper.classList.add('notification-wrapper');
-    wrapper.id = 'webmunk-notification';
+    wrapper.id = 'webmunk-rate-notification';
 
     const notificationContainer = document.createElement('div');
     notificationContainer.classList.add('notification-container');
@@ -212,7 +212,7 @@ export class RateService {
       notificationContainer.classList.add('notification-disappear');
 
       setTimeout(() => {
-        notificationContainer.remove();
+        wrapper.remove();
       }, 1000)
     });
 
@@ -233,7 +233,7 @@ export class RateService {
         if (this.responses?.relevance && this.responses?.distraction) {
           this.sendResponseToService(this.responses);
           notificationContainer.classList.add('notification-disappear');
-          setTimeout(() => notificationContainer.remove(), 2000);
+          setTimeout(() => wrapper.remove(), 2000);
         }
       });
     });
