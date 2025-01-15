@@ -25,6 +25,10 @@ export class AmazonStrategy extends BaseStrategy {
     let specifiedBox;
 
     const checkedBox = Array.from(boxes!).find((box) => box.checked);
+
+    // Retrieve the stored amazonInitialValue from local storage. After the page reloads,
+    // the state resets, and the initial value is taken as the current one, not the previous one.
+    // Therefore, it's important to store it beforehand to ensure the correct initial value is preserved.
     let { amazonInitialValue } = await chrome.storage.local.get('amazonInitialValue');
     const initialValue = checkedBox?.value === '0';
 

@@ -203,7 +203,7 @@ export class AdPersonalizationWorker {
           // Facebook doesn't work in the background,
           // so it is necessary for the Facebook tab to be active for proper functionality.
           if (url.includes(Url.FACEBOOK)) {
-            this.activateFacebookTab(createdTabId);
+            chrome.tabs.update(createdTabId, { active: true });
           }
 
           chrome.tabs.onUpdated.addListener((tabId: number, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
@@ -218,8 +218,4 @@ export class AdPersonalizationWorker {
       });
     });
   }
-
-  private activateFacebookTab(tabId: number): void {
-    chrome.tabs.update(tabId, { active: true });
-  };
 }
