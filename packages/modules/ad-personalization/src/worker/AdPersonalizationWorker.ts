@@ -200,6 +200,8 @@ export class AdPersonalizationWorker {
         if (tab && tab.id) {
           createdTabId = tab.id;
 
+          // Facebook doesn't work in the background,
+          // so it is necessary for the Facebook tab to be active for proper functionality.
           if (url.includes(Url.FACEBOOK)) {
             this.activateFacebookTab(createdTabId);
           }
