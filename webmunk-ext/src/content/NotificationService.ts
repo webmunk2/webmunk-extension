@@ -66,15 +66,6 @@ export class NotificationService {
         pointer-events: all;
       }
 
-      .notification-disappear {
-        animation: disappear 0.5s linear forwards;
-      }
-
-      @keyframes disappear {
-        0% { opacity: 1; }
-        100% { opacity: 0; }
-      }
-
       @keyframes appear {
         0% { opacity: 0; }
         100% { opacity: 1; }
@@ -127,12 +118,8 @@ export class NotificationService {
     document.documentElement.appendChild(wrapper);
 
     document.getElementById('close-button')!.addEventListener('click', () => {
-      notificationContainer.classList.add('notification-disappear');
       this.sendResponseToService();
-
-      setTimeout(() => {
-        wrapper.remove();
-      }, 1000);
+      wrapper.remove();
     });
 
     document.querySelector('.open-extensions-link')?.addEventListener('click', (event) => {

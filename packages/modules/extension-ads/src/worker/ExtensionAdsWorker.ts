@@ -5,8 +5,8 @@ import { RateService } from './RateService.ts';
 // @ts-ignore
 import { v4 as uuidv4 } from 'uuid';
 import filtersData from './url-filter.json';
-import tabUrlFiltersData from './tab-url-filter.json';
 import cosmeticFilteringEngine from './cosmetic-filtering.js';
+import hostUrlFilters from './host-url-filter.json';
 import {
   domainFromHostname,
   hostnameFromURI,
@@ -307,10 +307,20 @@ export class ExtensionAdsWorker {
     })
   }
 
-  private isdTabUrlNotValid(url: string): boolean {
-    const filters = tabUrlFiltersData.filters;
+  private isAdBlockNotValid(adData: AdData[]): boolean {
+    const filters = hostUrlFilters.filters;
 
-    return filters.some((filter) => url.startsWith(filter));
+    return adData.some((ad) => {
+      return ad.content.some((item) => {
+        const url = item.src || item.href;
+
+        if (url && filters.some((filter) => url.startsWith(filter))) {
+          return true;
+        }
+
+        return false;
+      });
+    });
   }
 
   public async _onMessage_adContent(data: { meta: any; adsData: AdData[] }, from: { tab: { id: number; url: string } }): Promise<void> {
@@ -319,7 +329,7 @@ export class ExtensionAdsWorker {
 
     if (!adsData.length) return;
 
-    if (this.isdTabUrlNotValid(tabUrl)) return;
+    if (this.isAdBlockNotValid(adsData)) return;
 
     const results = await Promise.all(
       adsData.map(async (data) => await this.processAdData(data, tabUrl, null))
@@ -358,17 +368,17 @@ export class ExtensionAdsWorker {
 
     // If not found, search all URLs in content
     if (!trackedAd) {
-      const originAndHostname = this.getOriginAndPathFromUrl(clickedUrl);
+      const originAndPath = this.getOriginAndPathFromUrl(clickedUrl);
 
       const parentAd = Array.from(this.tabData[tabId].ads.values()).find((storedAd) => {
         return storedAd.content.some((adUrl) => {
-          let storedOriginAndHostname = this.getOriginAndPathFromUrl(adUrl.href);
+          let storedOriginAndPath = this.getOriginAndPathFromUrl(adUrl.href);
 
-          if (storedOriginAndHostname !== originAndHostname && adUrl.redirectedUrl) {
-            storedOriginAndHostname = this.getOriginAndPathFromUrl(adUrl.redirectedUrl);
+          if (storedOriginAndPath !== originAndPath && adUrl.redirectedUrl) {
+            storedOriginAndPath = this.getOriginAndPathFromUrl(adUrl.redirectedUrl);
           }
 
-          return storedOriginAndHostname === originAndHostname;
+          return storedOriginAndPath === originAndPath;
         });
       });
 
