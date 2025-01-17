@@ -1,7 +1,6 @@
 {
   "filters": [
     "https://www.dropbox.com",
-    "https://www.google.com",
     "https://drive.google.com",
     "//www.google.com"
   ]

@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import filtersData from './url-filter.json';
 import cosmeticFilteringEngine from './cosmetic-filtering.js';
 import hostUrlFilters from './host-url-filter.json';
+import searchParamsFilters from './search-params-filter.json';
 import {
   domainFromHostname,
   hostnameFromURI,
@@ -18,13 +19,6 @@ type AdData = {
   text: string;
   content: Array<{ src?: string; href?: string; type: string }>;
   coordinates: any;
-};
-
-type AdContentItem = {
-  href?: string;
-  src?: string;
-  redirectedUrl?: string;
-  initialUrl?: string;
 };
 
 type ProcessedAdData = {
@@ -96,10 +90,9 @@ export class ExtensionAdsWorker {
       const prevUrl = openerTabId && this.tabData[openerTabId] ? this.tabData[openerTabId].url : null;
       this.tabData[tabId] = { ads: new Map(), title, url, status, prevUrl };
     } else if (status === 'loading') {
-      if (this.tabData[tabId].url !== url) {
-        this.tabData[tabId].prevUrl = this.tabData[tabId].url;
-      }
-      this.tabData[tabId].ads.clear();
+        if (this.tabData[tabId].url !== url) {
+          this.tabData[tabId].prevUrl = this.tabData[tabId].url;
+        }
     }
 
     this.tabData[tabId] = { ...this.tabData[tabId], title, url, status };
@@ -347,11 +340,11 @@ export class ExtensionAdsWorker {
     this.sendAdsIfNeeded(tabId);
   }
 
-  public async _onMessage_adClicked(data: { meta: any; adData: AdData; clickedUrl: string }, from: { tab: { id: number; url: string } }): Promise<void> {
+  public async _onMessage_adClicked(data: { clickedUrl: string }, from: { tab: { id: number; url: string } }): Promise<void> {
     const { id: tabId, url: tabUrl } = from.tab;
-    const { meta, adData, clickedUrl } = data;
+    const { clickedUrl } = data;
 
-    const trackedAd = this.findTrackedAd(tabId, clickedUrl, adData);
+    const trackedAd = this.findTrackedAd(tabId, clickedUrl);
 
     if (trackedAd) {
         const eventData = this.prepareEventData(trackedAd, tabUrl);
@@ -363,22 +356,28 @@ export class ExtensionAdsWorker {
     }
   }
 
-  private findTrackedAd(tabId: number, clickedUrl: string, adData: { content?: AdContentItem[] }): ProcessedAdData | undefined {
+  private findTrackedAd(tabId: number, clickedUrl: string): ProcessedAdData | undefined {
     let trackedAd = this.tabData[tabId].ads.get(clickedUrl);
 
-    // If not found, search all URLs in content
     if (!trackedAd) {
-      const originAndPath = this.getOriginAndPathFromUrl(clickedUrl);
-
       const parentAd = Array.from(this.tabData[tabId].ads.values()).find((storedAd) => {
         return storedAd.content.some((adUrl) => {
-          let storedOriginAndPath = this.getOriginAndPathFromUrl(adUrl.href);
+          if ((!adUrl.href && !adUrl.redirectedUrl) || adUrl.href.startsWith('/')) return false;
 
-          if (storedOriginAndPath !== originAndPath && adUrl.redirectedUrl) {
-            storedOriginAndPath = this.getOriginAndPathFromUrl(adUrl.redirectedUrl);
+          let customizedClickedUrl = this.getUrlWithoutRedundantSearchParams(clickedUrl);
+          let searchLink = this.getUrlWithoutRedundantSearchParams(adUrl.href);
+
+          if (searchLink !== customizedClickedUrl) {
+            const redirectedUrlNormalized = adUrl.redirectedUrl
+              ? this.getOriginAndPathFromUrl(adUrl.redirectedUrl)
+              : null;
+
+            customizedClickedUrl = this.getOriginAndPathFromUrl(clickedUrl);
+
+            searchLink = redirectedUrlNormalized ?? this.getOriginAndPathFromUrl(adUrl.href);
           }
 
-          return storedOriginAndPath === originAndPath;
+          return searchLink === customizedClickedUrl;
         });
       });
 
@@ -392,6 +391,18 @@ export class ExtensionAdsWorker {
     const urlObj = new URL(url);
 
     return `${urlObj.origin}${urlObj.pathname}`;
+  }
+
+  private getUrlWithoutRedundantSearchParams(url: string): string {
+    const paramsToRemove = searchParamsFilters.filters;
+    const parsedUrl = new URL(url);
+    const searchParams = parsedUrl.searchParams;
+
+    searchParams.forEach((_, key) => {
+      if (paramsToRemove.includes(key)) searchParams.delete(key);
+    })
+
+    return `${parsedUrl.origin}${parsedUrl.pathname}?${searchParams.toString()}`;
   }
 
   public _onMessage_captureRegion(request: any, _from: chrome.runtime.MessageSender): any {

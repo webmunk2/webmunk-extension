@@ -313,27 +313,6 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
           const adData = await adsMgr.extractAdData(0, node);
           adsData.push(adData);
         }
-
-        if (!isFrame() && !node.hasAttribute('data-click-handler-added')) {
-          node.setAttribute('data-click-handler-added', 'true');
-          node.setAttribute('data-click-processed', 'false');
-
-          node.addEventListener('click', async (event) => {
-            if (node.getAttribute('data-click-processed') === 'true') return;
-
-            await node.setAttribute('data-click-processed', 'true');
-
-            const clickedUrl = event.target.tagName === 'A'
-              ? event.target.href
-              : event.target.closest('a')?.href;
-
-            const meta = adsMgr.extractMeta();
-            const adData = await adsMgr.extractAdData(0, node);
-
-            await chrome.runtime.sendMessage({ action: adsMgr.getMainAppMgrName() + '.adClicked', data: { clickedUrl, meta, adData } });
-            await node.setAttribute('data-click-processed', 'false');
-          });
-        }
       }));
 
       if (adsData.length) {
@@ -354,7 +333,7 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
       // specific pattern for facebook (finally useless)
       if (node1.localName=="use") node = node1.parentElement;
       // To see ad units, restore the line below
-      // node.style.border=`dashed 2px ${color}`
+      node.style.border=`dashed 2px ${color}`
       if (node.style.display != "none") node.style.display="block"
       node.style.margin="2px"
       node.ads = true;
@@ -425,28 +404,6 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
           const frameData = await this.extractAdData(this.frameId);
 
           chrome.runtime.sendMessage({ action: this.getMainAppMgrName() + '.adContent', data: { meta, adsData: [frameData] } });
-
-          frameData.forEach(adElement => {
-            adElement.addEventListener('click', async (event) => {
-              if (adElement.getAttribute('data-click-processed') === 'true') return;
-
-              adElement.setAttribute('data-click-processed', 'true');
-
-              const clickedUrl = event.target.tagName === 'A'
-                ? event.target.href
-                : event.target.closest('a')?.href;
-
-              const meta = this.extractMeta();
-              const adData = await this.extractAdData(this.frameId);
-
-              await chrome.runtime.sendMessage({
-                action: this.getMainAppMgrName() + '.adClicked',
-                data: { clickedUrl, meta, adData }
-              });
-
-              adElement.setAttribute('data-click-processed', 'false');
-            });
-          });
         });
 
         this.postMessageMgr = new PostMessageMgr();
@@ -466,22 +423,6 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
           chrome.runtime.sendMessage({ action: this.getMainAppMgrName() + '.adContent', data: { meta, adsData } });
 
           this.initialAdContentSent = true;
-
-          adElements.forEach(adElement => {
-            adElement.addEventListener('click', async (event) => {
-              const clickedUrl = event.target.tagName === 'A'
-                ? event.target.href
-                : event.target.closest('a')?.href;
-
-              const meta = this.extractMeta();
-              const adData = await this.extractAdData(0, adElement);
-
-              chrome.runtime.sendMessage({
-                action: this.getMainAppMgrName() + '.adClicked',
-                data: { clickedUrl, meta, adData }
-              });
-            });
-          });
         });
 
         window.addEventListener('message', async (event) => {
@@ -841,11 +782,39 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
       // for iframes elem is document
       const element = elem || document;
 
+      this.addClickListenersToElements(element);
+
       const { title, text } = this.extractTexts(frameId, element);
       const content = this.extractContent(frameId, element);
       const coordinates = await this.getAdsCoordinates(element);
 
       return { title, text, content, coordinates };
+    },
+    addClickListenersToElements(elem) {
+      elem.addEventListener('click', async (event) => {
+        let clickedUrl;
+
+        if (window.location.href.includes('google.com')) {
+          const allLinks = elem.querySelectorAll('a');
+
+          // Check for available links: we take the second link because the first URL is typically encoded and cannot be used for matching
+          clickedUrl = allLinks.length > 1 ? allLinks[1].href : allLinks[0]?.href;
+        } else {
+          const { clientX, clientY } = event;
+
+          const hoveredElement = document.elementFromPoint(clientX, clientY);
+
+          if (!hoveredElement) return;
+
+          const closestLink = hoveredElement.tagName === 'A'
+            ? hoveredElement
+            : hoveredElement.closest('a');
+
+          clickedUrl = closestLink?.href || null;
+        }
+
+        chrome.runtime.sendMessage({ action: this.getMainAppMgrName() + '.adClicked', data: { clickedUrl } });
+      });
     },
     extractTexts(frameId, element) {
       // Selectors array to identify text elements
