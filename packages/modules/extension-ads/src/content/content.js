@@ -333,7 +333,7 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
       // specific pattern for facebook (finally useless)
       if (node1.localName=="use") node = node1.parentElement;
       // To see ad units, restore the line below
-      node.style.border=`dashed 2px ${color}`
+      // node.style.border=`dashed 2px ${color}`
       if (node.style.display != "none") node.style.display="block"
       node.style.margin="2px"
       node.ads = true;
