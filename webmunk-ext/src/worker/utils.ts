@@ -11,10 +11,19 @@ export const isNeedToDisableSurveyLoading = async (): Promise<boolean> => {
   return false;
 }
 
-export const getActiveTabId = async (): Promise<number> => {
+export const getActiveTabId = async (isNeedToCheckUrl?: boolean): Promise<number> => {
+  const excludedUrls = ['facebook.com/ad_preferences/ad_settings/data_from_partners', 'myadcenter.google.com', 'amazon.com/adprefs'];
+
   return new Promise((resolve, reject) => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const tab = tabs[0];
+
+      if (isNeedToCheckUrl) {
+        if (excludedUrls.some((url) => tab.url?.includes(url))) {
+          resolve(0)
+          return;
+        };
+      }
 
       if (!tab || !tab.id || tab.url?.startsWith('chrome://')) {
         resolve(0);
@@ -24,3 +33,4 @@ export const getActiveTabId = async (): Promise<number> => {
     });
   })
 };
+

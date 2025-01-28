@@ -50,11 +50,15 @@ export class SurveyService {
 
     if (currentDate < fillOutModalShowed + delayBetweenFillOutNotification) return;
 
-    const tabId = await getActiveTabId();
+    const tabId = await getActiveTabId(true);
     if (!tabId) return;
 
-    await chrome.storage.local.set({ fillOutModalShowed: currentDate });
-    await this.notificationService.showNotification(tabId, NotificationText.FILL_OUT);
+    try {
+      await this.notificationService.showNotification(tabId, NotificationText.FILL_OUT);
+      await chrome.storage.local.set({ fillOutModalShowed: currentDate });
+    } catch (error) {
+      console.error("Failed to show notification:", error);
+    }
   }
 
   public async initSurveysIfExists(): Promise<void> {

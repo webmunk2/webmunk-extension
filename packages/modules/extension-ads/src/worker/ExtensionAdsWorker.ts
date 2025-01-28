@@ -3,7 +3,6 @@ import webRequest from './traffic.js';
 // @ts-ignore
 import { RateService } from './RateService.ts';
 // @ts-ignore
-import { v4 as uuidv4 } from 'uuid';
 import filtersData from './url-filter.json';
 import cosmeticFilteringEngine from './cosmetic-filtering.js';
 import hostUrlFilters from './host-url-filter.json';
@@ -15,6 +14,7 @@ import {
 } from './uri-utils.js';
 
 type AdData = {
+  adId: string;
   title: string;
   text: string;
   content: Array<{ src?: string; href?: string; type: string }>;
@@ -66,6 +66,7 @@ export class ExtensionAdsWorker {
   private throttler: TimeThrottler;
   private rateService: RateService;
   private eventEmitter: any;
+  private lastClickTime: number | null = null;
 
   constructor () {
     this.throttler = new TimeThrottler(1, 200);
@@ -93,6 +94,7 @@ export class ExtensionAdsWorker {
         if (this.tabData[tabId].url !== url) {
           this.tabData[tabId].prevUrl = this.tabData[tabId].url;
         }
+        this.tabData[tabId].ads.clear();
     }
 
     this.tabData[tabId] = { ...this.tabData[tabId], title, url, status };
@@ -177,14 +179,13 @@ export class ExtensionAdsWorker {
     return !!url && !filters.some((filter) => url.includes(filter));
   }
 
-  private async processAdData({ title, text, content, coordinates }: { title: string; text: string; content: any; coordinates: any },
+  private async processAdData({ title, text, content, coordinates, adId }: { title: string; text: string; content: any; coordinates: any; adId: string },
     tabUrl: string,
     clickedUrl?: string | null
     ): Promise<ProcessedAdData | void>  {
     const uniqueUrls = new Set();
     const allowedRedirectTypes = ['a', 'div'];
     const filteredContent = content.filter(this.contentFilterPredicate);
-    const adId = uuidv4();
 
     const processedContent = await Promise.all(
       filteredContent.map(async (item: any) => {
@@ -322,88 +323,41 @@ export class ExtensionAdsWorker {
 
     if (!adsData.length) return;
 
-    if (this.isAdBlockNotValid(adsData)) return;
+    for (const adData of adsData) {
+      if (!this.isAdBlockNotValid([adData])) {
+        const result = await this.processAdData(adData, tabUrl, null);
+        if (!result) continue;
 
-    const results = await Promise.all(
-      adsData.map(async (data) => await this.processAdData(data, tabUrl, null))
-    );
-
-    results.forEach((result) => {
-      if (result) {
         this.tabData[tabId].ads.set(result.initialUrl, result);
-      }
-    });
 
-    console.log(`%cReceiving ad from tab ${tabId} - ${tabUrl}, ads detected: ${this.tabData[tabId].ads.size}`, 'color: green; font-weight: bold');
-    console.log('Tab data:', this.tabData[tabId]);
-    this.rateAdsIfNeeded(tabId);
-    this.sendAdsIfNeeded(tabId);
+        console.log(`%cReceiving ad from tab ${tabId} - ${tabUrl}, ads detected: ${this.tabData[tabId].ads.size}`, 'color: green; font-weight: bold');
+        console.log('Tab data:', this.tabData[tabId]);
+        this.rateAdsIfNeeded(tabId);
+        this.sendAdsIfNeeded(tabId);
+      }
+    }
   }
 
-  public async _onMessage_adClicked(data: { clickedUrl: string }, from: { tab: { id: number; url: string } }): Promise<void> {
+  public async _onMessage_adClicked(data: { clickedUrl: string, adId: string }, from: { tab: { id: number; url: string } }): Promise<void> {
     const { id: tabId, url: tabUrl } = from.tab;
-    const { clickedUrl } = data;
+    const { clickedUrl, adId } = data;
 
-    const trackedAd = this.findTrackedAd(tabId, clickedUrl);
+    const now = Date.now();
 
-    if (trackedAd) {
-        const eventData = this.prepareEventData(trackedAd, tabUrl);
-        console.log(`%cUser clicked on an ad: ${eventData.adId}`, 'color: orange');
-        console.log('Event data:', eventData);
-        this.eventEmitter.emit(moduleEvents.AD_CLICKED, eventData);
+    if (this.lastClickTime && now - this.lastClickTime < 1000) {
+      return;
+  }
+
+    this.lastClickTime = now;
+
+    if (clickedUrl) {
+        // console.log(`%cUser clicked on an url: ${clickedUrl}, id: ${adId}`, 'color: orange; font-weight: bold');
+        this.eventEmitter.emit(moduleEvents.AD_CLICKED, { adId, clickedUrl, pageUrl: tabUrl });
     } else {
         console.log("No tracked ad found for clicked URL.");
     }
   }
 
-  private findTrackedAd(tabId: number, clickedUrl: string): ProcessedAdData | undefined {
-    let trackedAd = this.tabData[tabId].ads.get(clickedUrl);
-
-    if (!trackedAd) {
-      const parentAd = Array.from(this.tabData[tabId].ads.values()).find((storedAd) => {
-        return storedAd.content.some((adUrl) => {
-          if ((!adUrl.href && !adUrl.redirectedUrl) || adUrl.href.startsWith('/')) return false;
-
-          let customizedClickedUrl = this.getUrlWithoutRedundantSearchParams(clickedUrl);
-          let searchLink = this.getUrlWithoutRedundantSearchParams(adUrl.href);
-
-          if (searchLink !== customizedClickedUrl) {
-            const redirectedUrlNormalized = adUrl.redirectedUrl
-              ? this.getOriginAndPathFromUrl(adUrl.redirectedUrl)
-              : null;
-
-            customizedClickedUrl = this.getOriginAndPathFromUrl(clickedUrl);
-
-            searchLink = redirectedUrlNormalized ?? this.getOriginAndPathFromUrl(adUrl.href);
-          }
-
-          return searchLink === customizedClickedUrl;
-        });
-      });
-
-      if (parentAd) trackedAd = parentAd;
-    }
-
-    return trackedAd;
-  }
-
-  private getOriginAndPathFromUrl(url: string): string {
-    const urlObj = new URL(url);
-
-    return `${urlObj.origin}${urlObj.pathname}`;
-  }
-
-  private getUrlWithoutRedundantSearchParams(url: string): string {
-    const paramsToRemove = searchParamsFilters.filters;
-    const parsedUrl = new URL(url);
-    const searchParams = parsedUrl.searchParams;
-
-    searchParams.forEach((_, key) => {
-      if (paramsToRemove.includes(key)) searchParams.delete(key);
-    })
-
-    return `${parsedUrl.origin}${parsedUrl.pathname}?${searchParams.toString()}`;
-  }
 
   public _onMessage_captureRegion(request: any, _from: chrome.runtime.MessageSender): any {
     return this.throttler.add(async () => {

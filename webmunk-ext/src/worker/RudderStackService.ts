@@ -1,3 +1,4 @@
+import 'setimmediate';
 import { Analytics } from '@rudderstack/analytics-js-service-worker';
 import { RUDDERSTACK_DATA_PLANE, RUDDERSTACK_WRITE_KEY } from '../config';
 import { FirebaseAppService } from './FirebaseAppService';
@@ -33,18 +34,6 @@ export class RudderStackService {
         properties,
         userId: user.uid,
       }, (err, data) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(data);
-        }
-      });
-    });
-  }
-
-  async flush(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.client.flush((err, data) => {
         if (err) {
           reject(err);
         } else {

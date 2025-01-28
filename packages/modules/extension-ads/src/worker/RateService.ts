@@ -17,7 +17,15 @@ export class RateService {
     }
   }
 
+  private async isExtensionHasToBeRemoved(): Promise<boolean> {
+    const result = await chrome.storage.local.get('removeModalShowed');
+
+    return result.removeModalShowed || false;
+  }
+
   private async shouldNotify(): Promise<boolean> {
+    if (await this.isExtensionHasToBeRemoved()) return false;
+
     const currentTime = Date.now();
 
     // 20 min
@@ -50,6 +58,8 @@ export class RateService {
           reject(null);
         }
       };
+
+      // active tab only
 
       chrome.runtime.onMessage.addListener(messageListener);
       chrome.tabs.onRemoved.addListener(tabCloseListener);

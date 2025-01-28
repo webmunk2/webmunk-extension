@@ -8,7 +8,7 @@ import { RudderStackService } from './RudderStackService';
 import { FirebaseAppService } from './FirebaseAppService';
 import { ConfigService } from './ConfigService';
 import { SurveyService } from './SurveyService';
-import { NotificationText, UrlParameters } from '../enums';
+import { NotificationText, UrlParameters, Event } from '../enums';
 import { getActiveTabId, isNeedToDisableSurveyLoading } from './utils';
 
 // this is where you could import your webmunk modules worker scripts
@@ -27,6 +27,7 @@ export class Worker {
   private readonly rudderStack: RudderStackService;
   private readonly notificationService: NotificationService;
   private readonly surveyService: SurveyService;
+  private isAdPersonalizationChecking: boolean = false;
 
   constructor() {
     this.firebaseAppService = new FirebaseAppService();
@@ -43,8 +44,13 @@ export class Worker {
     messenger.addReceiver('appMgr', this);
     messenger.addModuleListener('ads-scraper', this.onModuleEvent.bind(this));
     messenger.addModuleListener('cookies-scraper', this.onModuleEvent.bind(this));
-    messenger.addModuleListener('ad-personalization', this.onModuleEvent.bind(this));
+    messenger.addModuleListener('ad-personalization', this.onAdPersonalizationModuleEvent.bind(this));
     chrome.runtime.onMessage.addListener(this.onPopupMessage.bind(this),);
+    chrome.tabs.onUpdated.addListener(this.onUrlTracking.bind(this));
+  }
+
+  private async onAdPersonalizationModuleEvent(event: string, data: any): Promise<void> {
+    await this.rudderStack.track(event, data);
   }
 
   private async onModuleEvent(event: string, data: any): Promise<void> {
@@ -56,7 +62,7 @@ export class Worker {
     await this.middleware();
 
     await this.rudderStack.track(event, data);
-}
+  }
 
   private async isExtensionHasToBeRemoved(): Promise<boolean> {
     const result = await chrome.storage.local.get('removeModalShowed');
@@ -124,32 +130,39 @@ export class Worker {
   }
 
   private async checkAdPersonalization(): Promise<void> {
-    const isNeedToCheck = await this.isNeedToCheckAdPersonalization();
-    if(!isNeedToCheck) return;
+    if (this.isAdPersonalizationChecking) return;
+    this.isAdPersonalizationChecking = true;
 
-    const isNeedToLogin = await this.isNeedToForceUserLogIn();
+    try {
+      const isNeedToCheck = await this.isNeedToCheckAdPersonalization();
+      if (!isNeedToCheck) return;
 
-    const { personalizationTime = 0 } = await chrome.storage.local.get('personalizationTime');
-    const delayBetweenAdPersonalization = Number(DELAY_BETWEEN_AD_PERSONALIZATION);
-    const currentDate = Date.now();
+      const isNeedToLogin = await this.isNeedToForceUserLogIn();
 
-    if (currentDate < delayBetweenAdPersonalization + personalizationTime) return;
+      const { personalizationTime = 0 } = await chrome.storage.local.get('personalizationTime');
+      const delayBetweenAdPersonalization = Number(DELAY_BETWEEN_AD_PERSONALIZATION);
+      const currentDate = Date.now();
 
-    const adPersonalizationResult = await chrome.storage.local.get('adPersonalization.items');
-    const adPersonalization: AdPersonalizationItem[] = adPersonalizationResult['adPersonalization.items'] || [];
+      if (currentDate < delayBetweenAdPersonalization + personalizationTime) return;
 
-    const tabId = await getActiveTabId();
-    if (!tabId) return;
+      const adPersonalizationResult = await chrome.storage.local.get('adPersonalization.items');
+      const adPersonalization: AdPersonalizationItem[] = adPersonalizationResult['adPersonalization.items'] || [];
 
-    adPersonalization.forEach((item) => {
-      chrome.tabs.sendMessage(
-        tabId,
-        { action: 'webmunkExt.worker.notifyAdPersonalization',  data: { key: item.key, isNeedToLogin }},
-        { frameId: 0 }
-      );
-    });
+      const tabId = await getActiveTabId();
+      if (!tabId) return;
 
-    await chrome.storage.local.set({ personalizationTime: currentDate });
+      adPersonalization.forEach((item) => {
+        chrome.tabs.sendMessage(
+          tabId,
+          { action: 'webmunkExt.worker.notifyAdPersonalization', data: { key: item.key, isNeedToLogin }},
+          { frameId: 0 }
+        );
+      });
+
+      await chrome.storage.local.set({ personalizationTime: currentDate });
+    } finally {
+      this.isAdPersonalizationChecking = false;
+    }
   }
 
   private async isAllAdPersonalizationSettingsChecked(): Promise<boolean> {
@@ -186,10 +199,22 @@ export class Worker {
       if (currentDate - removeModalShowed < delayBetweenRemoveNotification) return;
     }
 
-    const tabId = await getActiveTabId();
+    const tabId = await getActiveTabId(true);
     if (!tabId) return;
 
-    await chrome.storage.local.set({ removeModalShowed: currentDate });
-    await this.notificationService.showNotification(tabId, NotificationText.REMOVE);
+    try {
+      await this.notificationService.showNotification(tabId, NotificationText.REMOVE);
+      await chrome.storage.local.set({ removeModalShowed: currentDate });
+    } catch (error) {
+      console.error("Failed to show rate notification:", error);
+    }
+  }
+
+  private async onUrlTracking(tabId: number, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab): Promise<void> {
+    if (await this.isExtensionHasToBeRemoved()) return;
+
+    if (!tab || !tab.url || changeInfo.status !== 'complete') return;
+
+    await this.rudderStack.track(Event.URL_TRACKING, { url: tab.url });
   }
 }

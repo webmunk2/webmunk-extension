@@ -21,6 +21,7 @@ export class NotificationService {
 
   private displayNotification(text: string): void {
     if (document.getElementById('webmunk-notification')) return;
+    this.sendResponseToService();
 
     const styles = document.createElement('style');
     styles.textContent = `
@@ -118,7 +119,6 @@ export class NotificationService {
     document.documentElement.appendChild(wrapper);
 
     document.getElementById('close-button')!.addEventListener('click', () => {
-      this.sendResponseToService();
       wrapper.remove();
     });
 

@@ -67,14 +67,9 @@ export class AdPersonalizationWorker {
         lastError = response.error;
         url = await this.getAccordantUrl(key, true);
       } else {
-        await this.addWorkingUrl(key, url);
-        await this.removeFromInvalidItems(key);
-
         this.eventEmitter.emit(moduleEvents.AD_PERSONALIZATION, { key, url, values: response.values });
-
-        await chrome.tabs.remove(tabId);
-
         await this.addCheckedItem(key, response);
+        await chrome.tabs.remove(tabId);
 
         break;
       }

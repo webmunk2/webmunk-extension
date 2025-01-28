@@ -19,6 +19,7 @@ export class NotificationService {
         if (message.action === 'webmunkExt.notificationService.extensionNotificationResponse') {
           chrome.runtime.onMessage.removeListener(messageListener);
           chrome.tabs.onRemoved.removeListener(tabCloseListener);
+          resolve();
         }
       };
 
