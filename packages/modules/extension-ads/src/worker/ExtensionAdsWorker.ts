@@ -6,7 +6,6 @@ import { RateService } from './RateService.ts';
 import filtersData from './url-filter.json';
 import cosmeticFilteringEngine from './cosmetic-filtering.js';
 import hostUrlFilters from './host-url-filter.json';
-import searchParamsFilters from './search-params-filter.json';
 import {
   domainFromHostname,
   hostnameFromURI,
@@ -357,7 +356,6 @@ export class ExtensionAdsWorker {
         console.log("No tracked ad found for clicked URL.");
     }
   }
-
 
   public _onMessage_captureRegion(request: any, _from: chrome.runtime.MessageSender): any {
     return this.throttler.add(async () => {

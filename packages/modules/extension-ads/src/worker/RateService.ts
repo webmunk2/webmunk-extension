@@ -59,8 +59,6 @@ export class RateService {
         }
       };
 
-      // active tab only
-
       chrome.runtime.onMessage.addListener(messageListener);
       chrome.tabs.onRemoved.addListener(tabCloseListener);
 
