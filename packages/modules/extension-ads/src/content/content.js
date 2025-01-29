@@ -308,7 +308,7 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
 
         const adId = uuidv4();
 
-        if (!adsMgr.hasARelatedAds(node, 1000000) && !node.hasAttribute('data-tracked')) {
+        if (!adsMgr.hasRelatedAds(node, 1000000) && !node.hasAttribute('data-tracked')) {
           this.highlightNodeAsAds(node, 0, 'darkgreen', pselectorAction, pselectorRaw);
         }
 
@@ -593,7 +593,7 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
         console.log("captureToCanvas ",data)
       })
     },
-    hasARelatedAds: function(node, maxLevel = 6) {
+    hasRelatedAds: function(node, maxLevel = 6) {
       let i = 0;
       let parent = node;
 
@@ -631,7 +631,7 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
       if (node.nodeType !== 1) return;
       if (this.ignoreTags.has(node.localName)) return;
       if (isFrame() && this.isAd) return;
-      if (node.localName === "iframe" && this.hasARelatedAds(node, 1)) {
+      if (node.localName === "iframe" && this.hasRelatedAds(node, 1)) {
         setTimeout(() => {
             this.waitForFrameId(node).then(id => {
                 node.setAttribute("data-webmunk-isad", true);
@@ -695,8 +695,8 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
             try {
               if (!node.matches("iframe") && node.matches(selector)) {
 
-                const hasARelatedAdvertisement = this.hasARelatedAds(node)
-                if (hasARelatedAdvertisement) return;
+                const hasRelatedAdvertisement = this.hasRelatedAds(node)
+                if (hasRelatedAdvertisement) return;
 
                 const hasContent = node.childNodes.length > 0 || node.textContent.trim() !== "";
                 if (!hasContent || node.hasAttribute('data-tracked')) return;

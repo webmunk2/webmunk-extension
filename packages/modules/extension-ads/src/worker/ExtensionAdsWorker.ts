@@ -329,8 +329,8 @@ export class ExtensionAdsWorker {
 
         this.tabData[tabId].ads.set(result.initialUrl, result);
 
-        console.log(`%cReceiving ad from tab ${tabId} - ${tabUrl}, ads detected: ${this.tabData[tabId].ads.size}`, 'color: green; font-weight: bold');
-        console.log('Tab data:', this.tabData[tabId]);
+        // console.log(`%cReceiving ad from tab ${tabId} - ${tabUrl}, ads detected: ${this.tabData[tabId].ads.size}`, 'color: green; font-weight: bold');
+        // console.log('Tab data:', this.tabData[tabId]);
         this.rateAdsIfNeeded(tabId);
         this.sendAdsIfNeeded(tabId);
       }
@@ -353,7 +353,7 @@ export class ExtensionAdsWorker {
         // console.log(`%cUser clicked on an url: ${clickedUrl}, id: ${adId}`, 'color: orange; font-weight: bold');
         this.eventEmitter.emit(moduleEvents.AD_CLICKED, { adId, clickedUrl, pageUrl: tabUrl });
     } else {
-        console.log("No tracked ad found for clicked URL.");
+        // console.log("No tracked ad found for clicked URL.");
     }
   }
 
