@@ -21,6 +21,7 @@ export class NotificationService {
 
   private displayNotification(text: string): void {
     if (document.getElementById('webmunk-notification')) return;
+    this.sendResponseToService();
 
     const styles = document.createElement('style');
     styles.textContent = `
@@ -64,15 +65,6 @@ export class NotificationService {
         white-space: nowrap;
         text-overflow: ellipsis;
         pointer-events: all;
-      }
-
-      .notification-disappear {
-        animation: disappear 0.5s linear forwards;
-      }
-
-      @keyframes disappear {
-        0% { opacity: 1; }
-        100% { opacity: 0; }
       }
 
       @keyframes appear {
@@ -127,12 +119,7 @@ export class NotificationService {
     document.documentElement.appendChild(wrapper);
 
     document.getElementById('close-button')!.addEventListener('click', () => {
-      notificationContainer.classList.add('notification-disappear');
-      this.sendResponseToService();
-
-      setTimeout(() => {
-        wrapper.remove();
-      }, 1000);
+      wrapper.remove();
     });
 
     document.querySelector('.open-extensions-link')?.addEventListener('click', (event) => {

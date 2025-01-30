@@ -18,7 +18,7 @@ export class RateService {
   }
 
   private showAdRatingNotification(): void {
-    if (document.getElementById('webmunk-notification')) return;
+    if (document.getElementById('webmunk-rate-notification')) return;
 
     const styles = document.createElement('style');
     styles.textContent = `
@@ -62,19 +62,6 @@ export class RateService {
         white-space: nowrap;
         text-overflow: ellipsis;
         pointer-events: all;
-      }
-
-      .notification-disappear {
-        animation: disappear 0.5s linear forwards;
-      }
-
-      @keyframes disappear {
-        0% {
-          opacity: 1;
-        }
-        100% {
-          opacity: 0;
-        }
       }
 
       @keyframes appear {
@@ -169,7 +156,7 @@ export class RateService {
     document.head.appendChild(styles);
     const wrapper = document.createElement('div');
     wrapper.classList.add('notification-wrapper');
-    wrapper.id = 'webmunk-notification';
+    wrapper.id = 'webmunk-rate-notification';
 
     const notificationContainer = document.createElement('div');
     notificationContainer.classList.add('notification-container');
@@ -180,7 +167,7 @@ export class RateService {
           <img style="width: 25px; height: 25px;" src="${chrome.runtime.getURL('images/favicon.png')}" alt="logo">
           <p style="font-size: 20px; color: black; margin: 0; line-height: 1.3;">Ad Study Survey</p>
         </div>
-        <svg id="close-button" class="close-button" height="20px" viewBox="0 0 384 512">
+        <svg id="rate-close-button" class="close-button" height="20px" viewBox="0 0 384 512">
           <path
             d="M342.6 150.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L192 210.7 86.6 105.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L146.7 256 41.4 361.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L192 301.3 297.4 406.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L237.3 256 342.6 150.6z"
           >
@@ -207,13 +194,9 @@ export class RateService {
     wrapper.appendChild(notificationContainer);
     document.documentElement.appendChild(wrapper);
 
-    document.getElementById('close-button')!.addEventListener('click', () => {
+    document.getElementById('rate-close-button')!.addEventListener('click', () => {
       this.sendResponseToService('skip');
-      notificationContainer.classList.add('notification-disappear');
-
-      setTimeout(() => {
-        notificationContainer.remove();
-      }, 1000)
+      wrapper.remove();
     });
 
     document.querySelectorAll('.response-btn').forEach((button) => {
@@ -232,8 +215,7 @@ export class RateService {
 
         if (this.responses?.relevance && this.responses?.distraction) {
           this.sendResponseToService(this.responses);
-          notificationContainer.classList.add('notification-disappear');
-          setTimeout(() => notificationContainer.remove(), 2000);
+          wrapper.remove();
         }
       });
     });

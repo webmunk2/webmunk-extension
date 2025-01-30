@@ -25,6 +25,10 @@ enum moduleEvents {
   AD_PERSONALIZATION = 'ad_personalization',
 }
 
+enum Url {
+  FACEBOOK = 'facebook.com'
+}
+
 export class AdPersonalizationWorker {
   private eventEmitter: any;
   private urlIndexes: { [key: string]: number } = {};
@@ -63,14 +67,9 @@ export class AdPersonalizationWorker {
         lastError = response.error;
         url = await this.getAccordantUrl(key, true);
       } else {
-        await this.addWorkingUrl(key, url);
-        await this.removeFromInvalidItems(key);
-
         this.eventEmitter.emit(moduleEvents.AD_PERSONALIZATION, { key, url, values: response.values });
-
-        await chrome.tabs.remove(tabId);
-
         await this.addCheckedItem(key, response);
+        await chrome.tabs.remove(tabId);
 
         break;
       }
@@ -192,9 +191,15 @@ export class AdPersonalizationWorker {
 
       chrome.runtime.onMessage.addListener(messageListener);
 
-      chrome.tabs.create({ url: url }, (tab) => {
+      chrome.tabs.create({ url: url, active: false }, (tab) => {
         if (tab && tab.id) {
           createdTabId = tab.id;
+
+          // Facebook doesn't work in the background,
+          // so it is necessary for the Facebook tab to be active for proper functionality.
+          if (url.includes(Url.FACEBOOK)) {
+            chrome.tabs.update(createdTabId, { active: true });
+          }
 
           chrome.tabs.onUpdated.addListener((tabId: number, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
             if (tabId === createdTabId && changeInfo.status === 'complete') {

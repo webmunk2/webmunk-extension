@@ -2,6 +2,7 @@ import PostMessageMgr from './postMessage'
 import _ from 'lodash'
 import './contentscript-extra'
 import { RateService } from './RateService';
+import { v4 as uuidv4 } from 'uuid';
 import iframeUrlFilter from './iframe-url-filter.json';
 
 const debugLog = {
@@ -305,34 +306,16 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
       await Promise.all(nodes.map(async (node) => {
         debugLog.procedural && node.setAttribute('data-webmunk-considered-processNodes', 'true');
 
-        if (!adsMgr.hasAnAdsParent(node, 1000000)) {
+        const adId = uuidv4();
+
+        if (!adsMgr.hasRelatedAds(node, 1000000) && !node.hasAttribute('data-tracked')) {
           this.highlightNodeAsAds(node, 0, 'darkgreen', pselectorAction, pselectorRaw);
         }
 
-        if (!isFrame() && adsMgr.initialAdContentSent) {
-          const adData = await adsMgr.extractAdData(0, node);
+        if (!isFrame()) {
+          adsMgr.addClickListenersToElements(null, node, adId);
+          const adData = await adsMgr.extractAdData(null, node, adId);
           adsData.push(adData);
-        }
-
-        if (!isFrame() && !node.hasAttribute('data-click-handler-added')) {
-          node.setAttribute('data-click-handler-added', 'true');
-          node.setAttribute('data-click-processed', 'false');
-
-          node.addEventListener('click', async (event) => {
-            if (node.getAttribute('data-click-processed') === 'true') return;
-
-            await node.setAttribute('data-click-processed', 'true');
-
-            const clickedUrl = event.target.tagName === 'A'
-              ? event.target.href
-              : event.target.closest('a')?.href;
-
-            const meta = adsMgr.extractMeta();
-            const adData = await adsMgr.extractAdData(0, node);
-
-            await chrome.runtime.sendMessage({ action: adsMgr.getMainAppMgrName() + '.adClicked', data: { clickedUrl, meta, adData } });
-            await node.setAttribute('data-click-processed', 'false');
-          });
         }
       }));
 
@@ -421,62 +404,18 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
             return;
           }
 
+          const adId = uuidv4();
+
           const meta = this.extractMeta();
-          const frameData = await this.extractAdData(this.frameId);
+          this.addClickListenersToElements(this.frameId, null, adId);
+          const frameData = await this.extractAdData(this.frameId, null, adId);
 
           chrome.runtime.sendMessage({ action: this.getMainAppMgrName() + '.adContent', data: { meta, adsData: [frameData] } });
-
-          document.addEventListener('click', async (event) => {
-            if (document.body.getAttribute('data-click-processed') === 'true') return;
-
-            await document.body.setAttribute('data-click-processed', 'true');
-
-            const clickedUrl = event.target.tagName === 'A'
-              ? event.target.href
-              : event.target.closest('a')?.href;
-
-            const meta = this.extractMeta();
-            const adData = await this.extractAdData(this.frameId);
-
-            await chrome.runtime.sendMessage({ action: this.getMainAppMgrName() + '.adClicked', data: { clickedUrl, meta, adData } });
-            await document.body.setAttribute('data-click-processed', 'false');
-          });
         });
 
         this.postMessageMgr = new PostMessageMgr();
         this.frameId = await chrome.runtime.sendMessage({ action: 'Messenger.getFrameId' });
-      } else { // main frame
-        const adElements = [];
-
-        document.addEventListener('DOMContentLoaded', async (event) => {
-          await this.wait(WAIT_BEFORE_EXTRACT);
-
-          const elements =  document.querySelectorAll('[data-webmunk-isad]');
-          elements.forEach(elem => elem.localName !== 'iframe' && adElements.push(elem));
-
-          const meta = this.extractMeta();
-          const adsData = await Promise.all(adElements.map(async (elem) => await this.extractAdData(0, elem)));
-
-          chrome.runtime.sendMessage({ action: this.getMainAppMgrName() + '.adContent', data: { meta, adsData } });
-
-          this.initialAdContentSent = true;
-        });
-
-        document.addEventListener('click', async (event) => {
-          const adElement = adElements.find((elt) => elt === event.target || elt.contains(event.target));
-
-          if (!adElement) return;
-
-          const clickedUrl = event.target.tagName === 'A'
-            ? event.target.href
-            : event.target.closest('a')?.href;
-
-          const meta = this.extractMeta();
-          const adData = await this.extractAdData(0, adElement);
-
-          chrome.runtime.sendMessage({ action: this.getMainAppMgrName() + '.adClicked', data: { clickedUrl, meta, adData } });
-        });
-
+      }
         window.addEventListener('message', async (event) => {
           if (event.data.action === 'iframeCoordinatesRequest') {
             const iframes = document.querySelectorAll('iframe');
@@ -505,7 +444,6 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
 
         this.postMessageMgr = new PostMessageMgr();
         this.postMessageMgr.setReceiver((data) => this.mainReceivePostMessage(data))
-      }
 
       this.iframeSourceObserver = new MutationObserver(this.iframeSourceModified);
 
@@ -542,6 +480,33 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
       this.isAd=value;
       console.log(`setIsad ${this.frameId} [${reason}]:`,value)
     },
+
+    async trackMainFrame(element) {
+      const adElements = [];
+
+      if (element.hasAttribute('data-tracked')) return;
+
+      element.setAttribute('data-tracked', true);
+
+      if (element.localName === 'iframe') return;
+
+      const adId = uuidv4();
+
+      adElements.push(element);
+      this.addClickListenersToElements(null, element, adId);
+
+      const meta = this.extractMeta();
+
+      const adsData = await Promise.all(
+        adElements.map(async (elem) => await this.extractAdData(null, elem, adId))
+      );
+
+      chrome.runtime.sendMessage({
+        action: this.getMainAppMgrName() + '.adContent',
+        data: { meta, adsData },
+      });
+    },
+
     _onBackgroundMessage(message, sender, reply) {
       let actionsMessage = isFrame() ? this.actionsMessageFrame : this.actionsMessageMain;
       if (!message.action || actionsMessage.indexOf(message.action) === -1) {
@@ -628,15 +593,35 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
         console.log("captureToCanvas ",data)
       })
     },
-    hasAnAdsParent:function(node, maxLevel=6){
+    hasRelatedAds: function(node, maxLevel = 6) {
       let i = 0;
       let parent = node;
-      while (i< maxLevel && parent.parentElement != null){
+
+      while (i < maxLevel && parent.parentElement != null) {
         i++;
+
         parent = parent.parentElement;
-        if (parent.hasAttribute("data-webmunk-isad")) return true;
+
+        if (parent.hasAttribute("data-webmunk-isad")) {
+          return true;
+        }
       }
-      return false;
+
+      const checkChildren = (element) => {
+        if (element.hasAttribute("data-webmunk-isad")) {
+          return true;
+        }
+
+        for (const child of element.children) {
+          if (checkChildren(child)) {
+            return true;
+          }
+        }
+
+        return false;
+      };
+
+      return checkChildren(node);
     },
     highlightNodeAsAds(node, _indent, color, detectionType, selectorRaw){
       vAPI.domFilterer.highlightNodeAsAds(node, _indent, color, detectionType, selectorRaw);
@@ -646,7 +631,7 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
       if (node.nodeType !== 1) return;
       if (this.ignoreTags.has(node.localName)) return;
       if (isFrame() && this.isAd) return;
-      if (node.localName === "iframe" && this.hasAnAdsParent(node, 1)) {
+      if (node.localName === "iframe" && this.hasRelatedAds(node, 1)) {
         setTimeout(() => {
             this.waitForFrameId(node).then(id => {
                 node.setAttribute("data-webmunk-isad", true);
@@ -682,7 +667,7 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
               if (isFrame()) {
                   console.log("Checking node for ad ascendance", node);
               }
-              if (!parentFrameIsAnAd) {
+              if (!parentFrameIsAnAd && !node.hasAttribute('data-tracked')) {
                   this.highlightNodeAsAds(node, _indent, "red", "urlIsAnAd-hit", node.src);
               }
           }
@@ -696,7 +681,7 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
         const isFiltered = filters.some((filter) => iframeSrc.includes(filter));
 
         // We use this check to avoid tracking non-ad blocks from specified URLs.
-        if (!isFiltered) {
+        if (!isFiltered && !node.hasAttribute('data-tracked')) {
             this.highlightNodeAsAds(node, _indent, "red", "urlIsAnAd-hit", node.src);
         }
       }
@@ -708,43 +693,26 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
             }
 
             try {
-              if (!node.matches("iframe") && node.matches(selector) && !this.hasAnAdsParent(node)) {
-                let parentFrameIsAnAd = false;
+              if (!node.matches("iframe") && node.matches(selector)) {
 
-                if (isFrame()) {
-                    console.log("Checking node for ad ascendance", node);
+                const hasRelatedAdvertisement = this.hasRelatedAds(node)
+                if (hasRelatedAdvertisement) return;
+
+                const hasContent = node.childNodes.length > 0 || node.textContent.trim() !== "";
+                if (!hasContent || node.hasAttribute('data-tracked')) return;
+
+                this.highlightNodeAsAds(node, _indent, "blue", "data-webmunk-cosmetic-hit", selector);
+                await this.trackMainFrame(node);
+              } else {
+                if (this.isAd && node.localName === "iframe") {
+                  node.setAttribute("data-webmunk-isad", true);
+                  const id = await this.waitForFrameId(node);
+                  chrome.runtime.sendMessage({
+                    action: "extensionAdsAppMgr.youAreAFrameAd",
+                    data: { frameId: parseInt(id, 10) }
+                  });
                 }
-
-                const observer = new MutationObserver((mutations) => {
-                  for (let mutation of mutations) {
-                    if (mutation.type === 'childList' || mutation.type === 'characterData') {
-                      const hasContent = node.childNodes.length > 0 || node.textContent.trim() !== "";
-
-                      if (hasContent && !parentFrameIsAnAd) {
-                        this.highlightNodeAsAds(node, _indent, "blue", "data-webmunk-cosmetic-hit", selector);
-                      }
-                    }
-                  }
-                });
-
-                observer.observe(node, {
-                    childList: true,
-                    subtree: true,
-                    characterData: true
-                });
-
-                } else {
-                    if (this.isAd && node.localName === "iframe") {
-                        node.setAttribute("data-webmunk-isad", true);
-                        const id = await this.waitForFrameId(node);
-                        chrome.runtime.sendMessage({
-                            action: "extensionAdsAppMgr.youAreAFrameAd",
-                            data: {
-                                frameId: parseInt(id, 10)
-                            }
-                        });
-                    }
-                }
+              }
             } catch (e) {
                 console.log(`Error processing selector: ${selector}`, e);
             }
@@ -830,7 +798,7 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
       })
       return content;
     },
-    async extractAdData(frameId, elem = null) {
+    async extractAdData(frameId, elem, adId) {
       // for iframes elem is document
       const element = elem || document;
 
@@ -838,8 +806,98 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
       const content = this.extractContent(frameId, element);
       const coordinates = await this.getAdsCoordinates(element);
 
-      return { title, text, content, coordinates };
+      return { title, text, content, coordinates, adId };
     },
+
+    async addClickListenersToElements(frameId, elem, adId) {
+      const element = elem || document;
+
+      await this.makeCloneIfNeeded(element);
+
+      element.addEventListener('click', (event) => {
+        let clickedUrl;
+
+        const { clientX, clientY } = event;
+
+        let hoveredElement = document.elementFromPoint(clientX, clientY);
+        if (!hoveredElement) return;
+
+        const closestLink = hoveredElement.tagName === 'A'
+          ? hoveredElement
+          : hoveredElement.closest('a');
+
+        clickedUrl = closestLink?.href || null;
+
+        if (!clickedUrl) {
+          clickedUrl = this.getClosestLink(hoveredElement);
+        }
+
+        chrome.runtime.sendMessage({
+          action: this.getMainAppMgrName() + '.adClicked',
+          data: { clickedUrl, adId }
+        });
+      });
+    },
+
+    async makeCloneIfNeeded(element) {
+      const thumbnailContainer = element.querySelector('#thumbnail-container');
+      if (!thumbnailContainer) return;
+
+      const clonedElement = thumbnailContainer.cloneNode(true);
+
+      if (!thumbnailContainer.parentElement) return;
+
+      await this.removeAriaHiddenBeforeClick(clonedElement);
+      thumbnailContainer.parentElement.replaceChild(clonedElement, thumbnailContainer);
+
+      clonedElement.removeAttribute('aria-hidden');
+      clonedElement.removeAttribute('tabindex');
+    },
+
+    async removeAriaHiddenBeforeClick(element) {
+      element.removeAttribute('aria-hidden');
+      element.removeAttribute('tabindex');
+
+      const elementsWithAriaHidden = element.querySelectorAll('[aria-hidden]');
+
+      elementsWithAriaHidden.forEach((el) => {
+        el.removeAttribute('aria-hidden');
+        el.removeAttribute('tabindex');
+      });
+    },
+
+    getClosestLink(element) {
+      while (element) {
+        if (element.tagName === 'A' && element.href) {
+          return element.href;
+        }
+
+        if (element.tagName === 'VIDEO' && element.src) {
+          if (element.src.startsWith('blob:')) {
+            element.src = element.src.replace('blob:', '');
+          }
+          return element.src;
+        }
+
+        const nestedLink = element.querySelector('a[href]');
+        if (nestedLink) {
+          return nestedLink.href;
+        }
+
+        const nestedVideo = element.querySelector('video[src]');
+        if (nestedVideo) {
+          if (nestedVideo.src.startsWith('blob:')) {
+            nestedVideo.src = nestedVideo.src.replace('blob:', '');
+          }
+          return nestedVideo.src;
+        }
+
+        element = element.parentElement;
+      }
+
+      return null;
+    },
+
     extractTexts(frameId, element) {
       // Selectors array to identify text elements
       const selectors = [

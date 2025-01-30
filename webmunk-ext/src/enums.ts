@@ -10,3 +10,7 @@ export enum UrlParameters {
   GOOGLE_AND_YOUTUBE = 'gyta',
   AMAZON = 'aap'
 }
+
+export enum Event {
+  URL_TRACKING = 'url_tracking'
+}

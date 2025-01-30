@@ -24,6 +24,19 @@ export class AmazonStrategy extends BaseStrategy {
 
     let specifiedBox;
 
+    const checkedBox = Array.from(boxes!).find((box) => box.checked);
+
+    // Retrieve the stored amazonInitialValue from local storage. After the page reloads,
+    // the state resets, and the initial value is taken as the current one, not the previous one.
+    // Therefore, it's important to store it beforehand to ensure the correct initial value is preserved.
+    let { amazonInitialValue } = await chrome.storage.local.get('amazonInitialValue');
+    const initialValue = checkedBox?.value === '0';
+
+    if (amazonInitialValue === undefined) {
+      amazonInitialValue = initialValue;
+      await chrome.storage.local.set({ amazonInitialValue });
+    }
+
     if (value === undefined) {
       specifiedBox = Array.from(boxes!).find((box) => box.checked);
       currentValue = specifiedBox?.value === '0';
@@ -35,7 +48,10 @@ export class AmazonStrategy extends BaseStrategy {
 
     if (!specifiedBox) return this.sendResponseToWorker(null, ErrorMessages.INVALID_URL);
 
-    if (specifiedBox?.checked) return this.sendResponseToWorker({ currentValue, initialValue: !value });
+    if (specifiedBox?.checked) {
+      await chrome.storage.local.set({ amazonInitialValue: initialValue });
+      return this.sendResponseToWorker({ currentValue, initialValue: amazonInitialValue })
+    };
 
     await new Promise((resolve) => requestAnimationFrame(resolve));
 
@@ -43,9 +59,10 @@ export class AmazonStrategy extends BaseStrategy {
 
     const saveButton = document.getElementById('optOutControl') as HTMLElement;
     saveButton?.click();
+    await chrome.storage.local.set({ amazonInitialValue: initialValue });
 
     const pageReloaded = await this.waitForPageReload();
 
-    if (pageReloaded) return this.sendResponseToWorker({ currentValue, initialValue: !value });
+    if (pageReloaded) return this.sendResponseToWorker({ currentValue, initialValue: value });
   }
 }

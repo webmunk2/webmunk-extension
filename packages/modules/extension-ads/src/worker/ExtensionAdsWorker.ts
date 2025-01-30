@@ -3,9 +3,9 @@ import webRequest from './traffic.js';
 // @ts-ignore
 import { RateService } from './RateService.ts';
 // @ts-ignore
-import { v4 as uuidv4 } from 'uuid';
 import filtersData from './url-filter.json';
 import cosmeticFilteringEngine from './cosmetic-filtering.js';
+import hostUrlFilters from './host-url-filter.json';
 import {
   domainFromHostname,
   hostnameFromURI,
@@ -13,17 +13,11 @@ import {
 } from './uri-utils.js';
 
 type AdData = {
+  adId: string;
   title: string;
   text: string;
   content: Array<{ src?: string; href?: string; type: string }>;
   coordinates: any;
-};
-
-type AdContentItem = {
-  href?: string;
-  src?: string;
-  redirectedUrl?: string;
-  initialUrl?: string;
 };
 
 type ProcessedAdData = {
@@ -71,6 +65,7 @@ export class ExtensionAdsWorker {
   private throttler: TimeThrottler;
   private rateService: RateService;
   private eventEmitter: any;
+  private lastClickTime: number | null = null;
 
   constructor () {
     this.throttler = new TimeThrottler(1, 200);
@@ -95,10 +90,10 @@ export class ExtensionAdsWorker {
       const prevUrl = openerTabId && this.tabData[openerTabId] ? this.tabData[openerTabId].url : null;
       this.tabData[tabId] = { ads: new Map(), title, url, status, prevUrl };
     } else if (status === 'loading') {
-      if (this.tabData[tabId].url !== url) {
-        this.tabData[tabId].prevUrl = this.tabData[tabId].url;
-      }
-      this.tabData[tabId].ads.clear();
+        if (this.tabData[tabId].url !== url) {
+          this.tabData[tabId].prevUrl = this.tabData[tabId].url;
+        }
+        this.tabData[tabId].ads.clear();
     }
 
     this.tabData[tabId] = { ...this.tabData[tabId], title, url, status };
@@ -125,10 +120,13 @@ export class ExtensionAdsWorker {
 
       if (res.redirected) {
         result.redirected = true;
-        result.redirectedUrl = res.url;
+        result.redirectedUrl = res.url.replace(/\\+/g, '');
       } else {
         const match = (await res.text()).match(/document\.location\.replace\("(.*)"\)/);
-        if (match && match[1]) result.redirected = true, result.redirectedUrl = match[1];
+        if (match && match[1]) {
+          result.redirected = true;
+          result.redirectedUrl = match[1].replace(/\\+/g, '');
+        }
       }
     } catch (error) {
       console.warn(`Exception fetching for redirects ${url}`, error);
@@ -180,14 +178,13 @@ export class ExtensionAdsWorker {
     return !!url && !filters.some((filter) => url.includes(filter));
   }
 
-  private async processAdData({ title, text, content, coordinates }: { title: string; text: string; content: any; coordinates: any },
+  private async processAdData({ title, text, content, coordinates, adId }: { title: string; text: string; content: any; coordinates: any; adId: string },
     tabUrl: string,
     clickedUrl?: string | null
     ): Promise<ProcessedAdData | void>  {
     const uniqueUrls = new Set();
     const allowedRedirectTypes = ['a', 'div'];
     const filteredContent = content.filter(this.contentFilterPredicate);
-    const adId = uuidv4();
 
     const processedContent = await Promise.all(
       filteredContent.map(async (item: any) => {
@@ -303,64 +300,61 @@ export class ExtensionAdsWorker {
     })
   }
 
+  private isAdBlockNotValid(adData: AdData[]): boolean {
+    const filters = hostUrlFilters.filters;
+
+    return adData.some((ad) => {
+      return ad.content.some((item) => {
+        const url = item.src || item.href;
+
+        if (url && filters.some((filter) => url.startsWith(filter))) {
+          return true;
+        }
+
+        return false;
+      });
+    });
+  }
+
   public async _onMessage_adContent(data: { meta: any; adsData: AdData[] }, from: { tab: { id: number; url: string } }): Promise<void> {
     const { id: tabId, url: tabUrl } = from.tab;
     const { meta, adsData } = data;
 
     if (!adsData.length) return;
 
-    const results = await Promise.all(
-      adsData.map(async (data) => await this.processAdData(data, tabUrl, null))
-    );
+    for (const adData of adsData) {
+      if (!this.isAdBlockNotValid([adData])) {
+        const result = await this.processAdData(adData, tabUrl, null);
+        if (!result) continue;
 
-    results.forEach((result) => {
-      if (result) {
         this.tabData[tabId].ads.set(result.initialUrl, result);
-      }
-    });
 
-    console.log(`%cReceiving ad from tab ${tabId} - ${tabUrl}, ads detected: ${this.tabData[tabId].ads.size}`, 'color: green; font-weight: bold');
-    console.log('Tab data:', this.tabData[tabId]);
-    this.rateAdsIfNeeded(tabId);
-    this.sendAdsIfNeeded(tabId);
+        // console.log(`%cReceiving ad from tab ${tabId} - ${tabUrl}, ads detected: ${this.tabData[tabId].ads.size}`, 'color: green; font-weight: bold');
+        // console.log('Tab data:', this.tabData[tabId]);
+        this.rateAdsIfNeeded(tabId);
+        this.sendAdsIfNeeded(tabId);
+      }
+    }
   }
 
-  public async _onMessage_adClicked(data: { meta: any; adData: AdData; clickedUrl: string }, from: { tab: { id: number; url: string } }): Promise<void> {
+  public async _onMessage_adClicked(data: { clickedUrl: string, adId: string }, from: { tab: { id: number; url: string } }): Promise<void> {
     const { id: tabId, url: tabUrl } = from.tab;
-    const { meta, adData, clickedUrl } = data;
+    const { clickedUrl, adId } = data;
 
-    const trackedAd = this.findTrackedAd(tabId, clickedUrl, adData);
+    const now = Date.now();
 
-    if (trackedAd) {
-        const eventData = this.prepareEventData(trackedAd, tabUrl);
-        console.log(`%cUser clicked on an ad: ${eventData.adId}`, 'color: orange');
-        console.log('Event data:', eventData);
-        this.eventEmitter.emit(moduleEvents.AD_CLICKED, eventData);
-    } else {
-        console.log("No tracked ad found for clicked URL.");
-    }
+    if (this.lastClickTime && now - this.lastClickTime < 1000) {
+      return;
   }
 
-  private findTrackedAd(tabId: number, clickedUrl: string, adData: { content?: AdContentItem[] }): ProcessedAdData | undefined {
-    let trackedAd = this.tabData[tabId].ads.get(clickedUrl);
+    this.lastClickTime = now;
 
-    // If not found, search all URLs in content
-    if (!trackedAd && adData?.content) {
-      const contentItem = adData.content.find((item) => {
-        const { href, src, redirectedUrl, initialUrl } = item;
-        const urlsToCheck = [href, src, redirectedUrl, initialUrl];
-
-        return urlsToCheck.some((url) => url && this.tabData[tabId].ads.has(url));
-      });
-
-      if (contentItem) {
-        const { href, src, redirectedUrl, initialUrl } = contentItem;
-        const urlsToCheck = [href, src, redirectedUrl, initialUrl];
-        trackedAd = this.tabData[tabId].ads.get(urlsToCheck.find((url) => url && this.tabData[tabId].ads.has(url))!);
-      }
+    if (clickedUrl) {
+        // console.log(`%cUser clicked on an url: ${clickedUrl}, id: ${adId}`, 'color: orange; font-weight: bold');
+        this.eventEmitter.emit(moduleEvents.AD_CLICKED, { adId, clickedUrl, pageUrl: tabUrl });
+    } else {
+        // console.log("No tracked ad found for clicked URL.");
     }
-
-    return trackedAd;
   }
 
   public _onMessage_captureRegion(request: any, _from: chrome.runtime.MessageSender): any {
