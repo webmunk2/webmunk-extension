@@ -333,9 +333,9 @@ export class ExtensionAdsWorker {
         // console.log('Tab data:', this.tabData[tabId]);
         this.rateAdsIfNeeded(tabId);
         this.sendAdsIfNeeded(tabId);
-      }
     }
   }
+}
 
   public async _onMessage_adClicked(data: { clickedUrl: string, adId: string }, from: { tab: { id: number; url: string } }): Promise<void> {
     const { id: tabId, url: tabUrl } = from.tab;
@@ -349,7 +349,7 @@ export class ExtensionAdsWorker {
 
     this.lastClickTime = now;
 
-    if (clickedUrl) {
+    if (clickedUrl || adId) {
         // console.log(`%cUser clicked on an url: ${clickedUrl}, id: ${adId}`, 'color: orange; font-weight: bold');
         this.eventEmitter.emit(moduleEvents.AD_CLICKED, { adId, clickedUrl, pageUrl: tabUrl });
     } else {

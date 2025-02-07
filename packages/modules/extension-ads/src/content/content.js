@@ -306,9 +306,13 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
       await Promise.all(nodes.map(async (node) => {
         debugLog.procedural && node.setAttribute('data-webmunk-considered-processNodes', 'true');
 
+        if (node.hasAttribute('data-adId')) return;
+
         const adId = uuidv4();
 
-        if (!adsMgr.hasRelatedAds(node, 1000000) && !node.hasAttribute('data-tracked')) {
+        node.setAttribute('data-adId', adId);
+
+        if (!adsMgr.hasRelatedAds(node, 1000000)) {
           this.highlightNodeAsAds(node, 0, 'darkgreen', pselectorAction, pselectorRaw);
         }
 
@@ -377,6 +381,8 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
     appMgrName: 'extensionAdsAppMgr',
     async initialize(){
       chrome.runtime.onMessage.addListener(this._onBackgroundMessage.bind(this));
+
+      if (window.location.href.includes("google.com/search")) this.handleGoogleSearchClicking();
 
       if (isFrame()) {
         this.isAd = false;
@@ -481,6 +487,67 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
       console.log(`setIsad ${this.frameId} [${reason}]:`,value)
     },
 
+    handleGoogleSearchClicking() {
+      document.addEventListener('click', (event) => {
+        const { clientX, clientY } = event;
+        let realTarget = document.elementFromPoint(clientX, clientY);
+        if (!realTarget) return;
+
+        const relatedAds = this.getRelatedAds(realTarget);
+
+        let adId;
+
+        if (relatedAds && relatedAds.contains(realTarget)) {
+          adId = isAd.dataset.adid;
+        } else if (relatedAds) {
+          if (realTarget.tagName === 'IMG') {
+            const cssId = realTarget.dataset.csiid;
+            const cssIdPrefix = cssId ? cssId.slice(0, 6) : null;
+
+            const realTargetId = realTarget.id || '';
+            const isValidId = realTargetId.startsWith('platop') || realTargetId.startsWith('plahover');
+
+            if (cssIdPrefix && isValidId) {
+              const adElementWithCssid = [...relatedAds.querySelectorAll('[data-csiid]')].find((el) =>
+                el.dataset.csiid.startsWith(cssIdPrefix)
+              );
+
+              if (adElementWithCssid) adId = relatedAds.dataset.adid;
+            }
+          } else if (realTarget.tagName === 'SPAN' || realTarget.tagName === 'DIV') {
+            const spanText = realTarget.innerText || realTarget.textContent;
+
+            if (spanText.trim()) {
+              const adElementWithText = Array.from(relatedAds.querySelectorAll('*')).find((el) => {
+                return el.innerText.includes(spanText) || el.textContent.includes(spanText);
+              });
+
+              if (adElementWithText) adId = relatedAds.dataset.adid;
+            }
+          }
+        }
+
+        if (!adId) return;
+
+        const closestLink = realTarget.tagName === 'A'
+          ? realTarget
+          : realTarget.closest('a');
+
+        let clickedUrl = closestLink?.href || null;
+
+        if (!clickedUrl) {
+          clickedUrl = this.getClosestLink(realTarget);
+        }
+
+        if (clickedUrl) {
+          chrome.runtime.sendMessage({
+            action: this.getMainAppMgrName() + '.adClicked',
+            data: { clickedUrl, adId }
+          });
+        }
+      }, true);
+    },
+
     async trackMainFrame(element) {
       const adElements = [];
 
@@ -488,9 +555,11 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
 
       element.setAttribute('data-tracked', true);
 
-      if (element.localName === 'iframe') return;
+      if (element.localName === 'iframe' || element.hasAttribute('data-adId')) return;
 
       const adId = uuidv4();
+
+      element.setAttribute('data-adId', adId);
 
       adElements.push(element);
       this.addClickListenersToElements(null, element, adId);
@@ -623,6 +692,24 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
 
       return checkChildren(node);
     },
+
+    getRelatedAds: function(node, maxLevel = 10) {
+      let i = 0;
+      let parent = node;
+
+      while (i < maxLevel && parent.parentElement != null) {
+        i++;
+
+        parent = parent.parentElement;
+
+        if (parent.hasAttribute("data-webmunk-isad")) {
+          return parent;
+        }
+      }
+
+      return document.querySelector('[data-adid]');
+    },
+
     highlightNodeAsAds(node, _indent, color, detectionType, selectorRaw){
       vAPI.domFilterer.highlightNodeAsAds(node, _indent, color, detectionType, selectorRaw);
     },
@@ -837,7 +924,7 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
           data: { clickedUrl, adId }
         });
       });
-    },
+  },
 
     async makeCloneIfNeeded(element) {
       const thumbnailContainer = element.querySelector('#thumbnail-container');
