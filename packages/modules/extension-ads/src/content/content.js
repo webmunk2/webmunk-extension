@@ -382,6 +382,9 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
     async initialize(){
       chrome.runtime.onMessage.addListener(this._onBackgroundMessage.bind(this));
 
+      // Special handling for Google Search because its DOM rendering differs from other sites.
+      // Google dynamically updates the search results without a full page reload,
+      // so we need to attach event listeners separately.
       if (window.location.href.includes("google.com/search")) this.handleGoogleSearchClicking();
 
       if (isFrame()) {
