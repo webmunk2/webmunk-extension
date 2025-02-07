@@ -349,7 +349,7 @@ export class ExtensionAdsWorker {
 
     this.lastClickTime = now;
 
-    if (clickedUrl) {
+    if (clickedUrl || adId) {
         // console.log(`%cUser clicked on an url: ${clickedUrl}, id: ${adId}`, 'color: orange; font-weight: bold');
         this.eventEmitter.emit(moduleEvents.AD_CLICKED, { adId, clickedUrl, pageUrl: tabUrl });
     } else {
