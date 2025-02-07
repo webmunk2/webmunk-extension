@@ -333,9 +333,9 @@ export class ExtensionAdsWorker {
         // console.log('Tab data:', this.tabData[tabId]);
         this.rateAdsIfNeeded(tabId);
         this.sendAdsIfNeeded(tabId);
+      }
     }
   }
-}
 
   public async _onMessage_adClicked(data: { clickedUrl: string, adId: string }, from: { tab: { id: number; url: string } }): Promise<void> {
     const { id: tabId, url: tabUrl } = from.tab;

@@ -924,7 +924,7 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
           data: { clickedUrl, adId }
         });
       });
-  },
+    },
 
     async makeCloneIfNeeded(element) {
       const thumbnailContainer = element.querySelector('#thumbnail-container');
