@@ -501,7 +501,7 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
         let adId;
 
         if (relatedAds && relatedAds.contains(realTarget)) {
-          adId = isAd.dataset.adid;
+          adId = relatedAds.dataset.adid;
         } else if (relatedAds) {
           if (realTarget.tagName === 'IMG') {
             const cssId = realTarget.dataset.csiid;
