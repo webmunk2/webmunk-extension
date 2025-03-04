@@ -17,6 +17,10 @@ The module uses a message-driven architecture for communication. It listens to a
 Description: This event is triggered to check the privacy settings related to cookies on a website.
   Data: None
 Action: The module retrieves privacy settings and emits relevant data about cookie handling and privacy.
+2. webmunkExt.worker.recordCookies
+Description: This event is triggered to record all cookies from the browser's memory.
+  Data: None
+Action: The module retrieves all cookies and emits relevant data.
 
 ## License and Other Project Information
 

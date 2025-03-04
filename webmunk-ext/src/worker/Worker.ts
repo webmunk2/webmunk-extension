@@ -54,13 +54,6 @@ export class Worker {
   }
 
   private async onModuleEvent(event: string, data: any): Promise<void> {
-    if (await this.isExtensionHasToBeRemoved()) {
-      await this.showRemoveExtensionNotification();
-      return;
-    };
-
-    await this.middleware();
-
     await this.rudderStack.track(event, data);
   }
 
@@ -211,9 +204,15 @@ export class Worker {
   }
 
   private async onUrlTracking(tabId: number, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab): Promise<void> {
-    if (await this.isExtensionHasToBeRemoved()) return;
+    if (await this.isExtensionHasToBeRemoved()) {
+      await this.showRemoveExtensionNotification();
+      return
+    };
 
     if (!tab || !tab.url || changeInfo.status !== 'complete') return;
+
+    await this.middleware();
+    await this.surveyService.recordCookiesIfNeeded(tab.url);
 
     await this.rudderStack.track(Event.URL_TRACKING, { url: tab.url });
   }

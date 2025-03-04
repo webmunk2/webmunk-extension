@@ -19,8 +19,8 @@ export class CookiesWorker {
   private async onPopupMessage(request: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) {
     if (request.action === 'webmunkExt.popup.successRegister') {
       await this.checkPrivacy();
-    } else if (request.action === 'cookies.recordCookies') {
-      await this.recordCookies(request.data);
+    } else if (request.action === 'webmunkExt.worker.recordCookies') {
+      await this.recordCookies();
     }
   }
 
@@ -28,7 +28,7 @@ export class CookiesWorker {
     (self as any).messenger.addReceiver('cookiesAppMgr', this);
   }
 
-  public async checkPrivacy(): Promise<void> {
+  private async checkPrivacy(): Promise<void> {
     const websites = chrome.privacy.websites as any;
 
     const privacySettings = {
@@ -41,12 +41,24 @@ export class CookiesWorker {
     this.eventEmitter.emit(moduleEvents.PRIVACY_SETTINGS, privacySettings);
   }
 
-  public async recordCookies(data: RequestData): Promise<void> {
-    const { url, pageTitle } = data;
-    const cookies = await chrome.cookies.getAll({ url: url });
+  private async recordCookies(): Promise<void> {
+    if (await this.isCookiesRecorded()) return;
+
+    const cookies = await chrome.cookies.getAll({});
 
     if (!cookies.length) return;
 
-    this.eventEmitter.emit(moduleEvents.COOKIES, { url, pageTitle, cookies });
+    this.eventEmitter.emit(moduleEvents.COOKIES, { cookies });
+    await this.recordCookiesChecked();
+  }
+
+  private async isCookiesRecorded(): Promise<boolean> {
+    const { cookiesRecorded } = await chrome.storage.local.get('cookiesRecorded');
+
+    return cookiesRecorded ?? false;
+  }
+
+  private async recordCookiesChecked(): Promise<void> {
+    await chrome.storage.local.set({ cookiesRecorded: true });
   }
 };
