@@ -212,7 +212,7 @@ export class Worker {
     if (!tab || !tab.url || changeInfo.status !== 'complete') return;
 
     await this.middleware();
-    await this.surveyService.recordCookiesIfNeeded(tab.url);
+    await this.surveyService.isThisSurveyUrl(tab.url);
 
     await this.rudderStack.track(Event.URL_TRACKING, { url: tab.url });
   }

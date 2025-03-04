@@ -10,6 +10,7 @@ import { FirebaseAppService } from './FirebaseAppService';
 
 enum events {
   SURVEY_COMPLETED = 'survey_completed',
+  SURVEY_STARTED = 'survey_started',
 }
 
 export class SurveyService {
@@ -237,8 +238,15 @@ export class SurveyService {
     return currentTime >= weekEndTime;
   }
 
-  public async recordCookiesIfNeeded(url: string): Promise<void> {
-    if (!this.completedSurveys.length || !this.surveys.some((survey) => survey.url === url)) return;
+  public async isThisSurveyUrl(url: string): Promise<void> {
+    if (!this.surveys.some((survey) => survey.url === url)) return;
+
+    await this.rudderStack.track(events.SURVEY_STARTED, { surveyUrl: url });
+    await this.recordCookiesIfNeeded();
+  }
+
+  public async recordCookiesIfNeeded(): Promise<void> {
+    if (!this.completedSurveys.length) return;
 
     const tabId = await getActiveTabId();
     if (!tabId) return;
