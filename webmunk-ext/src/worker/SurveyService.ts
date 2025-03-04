@@ -236,4 +236,13 @@ export class SurveyService {
 
     return currentTime >= weekEndTime;
   }
+
+  public async recordCookiesIfNeeded(url: string): Promise<void> {
+    if (!this.completedSurveys.length || !this.surveys.some((survey) => survey.url === url)) return;
+
+    const tabId = await getActiveTabId();
+    if (!tabId) return;
+
+    await chrome.tabs.sendMessage(tabId, { action: 'webmunkExt.worker.notifyCookiesModule' }, { frameId: 0 });
+  }
 }

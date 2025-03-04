@@ -3,11 +3,13 @@ export class NotificationService {
     chrome.runtime.onMessage.addListener(this.handleMessage.bind(this));
   }
 
-  private handleMessage(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void): void {
+  private async handleMessage(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void): Promise<void> {
     if (message.action === 'webmunkExt.notificationService.extensionNotificationRequest') {
       this.showNotification(message.text);
     } else if (message.action === 'webmunkExt.worker.notifyAdPersonalization') {
-      chrome.runtime.sendMessage({ action: 'webmunkExt.popup.checkSettingsReq', data: message.data })
+      await chrome.runtime.sendMessage({ action: 'webmunkExt.popup.checkSettingsReq', data: message.data })
+    } else if (message.action === 'webmunkExt.worker.notifyCookiesModule') {
+      await chrome.runtime.sendMessage({ action: 'webmunkExt.worker.recordCookies' });
     }
   }
 
