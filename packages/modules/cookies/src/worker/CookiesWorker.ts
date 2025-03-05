@@ -3,11 +3,6 @@ enum moduleEvents {
   PRIVACY_SETTINGS = 'privacy_settings',
 };
 
-interface RequestData {
-  url: string;
-  pageTitle: string;
-}
-
 export class CookiesWorker {
   private eventEmitter: any;
 

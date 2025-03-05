@@ -241,8 +241,8 @@ export class SurveyService {
   public async isThisSurveyUrl(url: string): Promise<void> {
     if (!this.surveys.some((survey) => survey.url === url)) return;
 
-    await this.rudderStack.track(events.SURVEY_STARTED, { surveyUrl: url });
     await this.recordCookiesIfNeeded();
+    await this.rudderStack.track(events.SURVEY_STARTED, { surveyUrl: url });
   }
 
   public async recordCookiesIfNeeded(): Promise<void> {

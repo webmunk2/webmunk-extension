@@ -54,23 +54,18 @@ export class Worker {
   }
 
   private async onModuleEvent(event: string, data: any): Promise<void> {
+    if (await this.isExtensionHasToBeRemoved()) {
+      await this.showRemoveExtensionNotification();
+      return
+    };
+
     await this.rudderStack.track(event, data);
-  }
-
-  private async isExtensionHasToBeRemoved(): Promise<boolean> {
-    const result = await chrome.storage.local.get('removeModalShowed');
-
-    return result.removeModalShowed || false;
   }
 
   private async middleware(): Promise<void> {
     const user = await this.firebaseAppService.getUser();
 
-    if (!user) return
-
-    await this.showRemoveExtensionIfNeeded(user);
-
-    if (!user.active) return
+    if (!user || !user.active) return
 
     await this.checkAdPersonalization();
     await this.surveyService.initSurveysIfNeeded();
@@ -168,29 +163,26 @@ export class Worker {
     return Object.keys(checkedAdPersonalization).length === adPersonalization.length;
   }
 
-  private async showRemoveExtensionIfNeeded(user: User): Promise<void> {
+  private async isExtensionHasToBeRemoved(): Promise<boolean> {
     const completedSurveysResult = await chrome.storage.local.get('completedSurveys');
     const completedSurveys = completedSurveysResult.completedSurveys || [];
     const needToDisableSurveyLoading = await isNeedToDisableSurveyLoading();
 
-    if (needToDisableSurveyLoading) {
-      await this.showRemoveExtensionNotification(true);
-    } else if ((completedSurveys.length === 2 && await this.isAllAdPersonalizationSettingsChecked()) || !user.active) {
-      await this.showRemoveExtensionNotification();
+    if (needToDisableSurveyLoading && await this.surveyService.isWeekPassed()) {
+      return true;
+    } else if ((completedSurveys.length === 2 && await this.isAllAdPersonalizationSettingsChecked())) {
+      return true;
     }
+
+    return false;
   }
 
-  private async showRemoveExtensionNotification(isDisableSurveyLoading?: boolean): Promise<void> {
+  private async showRemoveExtensionNotification(): Promise<void> {
     const { removeModalShowed = 0 } = await chrome.storage.local.get('removeModalShowed');
     const currentDate = Date.now();
+    const delayBetweenRemoveNotification = Number(DELAY_BETWEEN_REMOVE_NOTIFICATION);
 
-    if (isDisableSurveyLoading && removeModalShowed === 0) {
-      if (!await this.surveyService.isWeekPassed()) return;
-    } else {
-      const delayBetweenRemoveNotification = Number(DELAY_BETWEEN_REMOVE_NOTIFICATION);
-
-      if (currentDate - removeModalShowed < delayBetweenRemoveNotification) return;
-    }
+    if (currentDate - removeModalShowed < delayBetweenRemoveNotification) return;
 
     const tabId = await getActiveTabId(true);
     if (!tabId) return;
