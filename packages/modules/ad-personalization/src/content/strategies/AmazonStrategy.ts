@@ -6,16 +6,16 @@ export class AmazonStrategy extends BaseStrategy {
   public strategyKey = 'aap';
 
   async execute(data: PersonalizationData) {
-    const { value, isNeedToLogin } = data;
+    const { value } = data;
     let currentValue = value ?? false;
 
     const signInButton = document.querySelector('#a-autoid-0-announce') as HTMLElement;
 
-    if (signInButton && !isNeedToLogin) return this.sendResponseToWorker(null);
+    if (signInButton) {
+      const initialUrl = window.location.href;
 
-    if (signInButton && isNeedToLogin) {
       signInButton.click();
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await this.observeUrlChanging(initialUrl);
     }
 
     const boxes = await this.waitForElements<HTMLInputElement>('[name="optout"]', true);
@@ -64,5 +64,18 @@ export class AmazonStrategy extends BaseStrategy {
     const pageReloaded = await this.waitForPageReload();
 
     if (pageReloaded) return this.sendResponseToWorker({ currentValue, initialValue: value });
+  }
+
+  private async observeUrlChanging(url: string): Promise<void> {
+    return new Promise((resolve) => {
+      const observer = new MutationObserver(() => {
+        if (window.location.href !== url) {
+          observer.disconnect();
+          resolve();
+        }
+      });
+
+      observer.observe(document, { subtree: true, childList: true });
+    });
   }
 }

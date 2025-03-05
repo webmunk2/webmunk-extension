@@ -5,12 +5,8 @@ export class GoogleAndYoutubeStrategy extends BaseStrategy {
   public strategyKey = 'gyta';
 
   async execute(data: PersonalizationData) {
-    const { value, isNeedToLogin } = data;
+    const { value } = data;
     let currentValue = value ?? false;
-
-    if (!isNeedToLogin && window.document.title.includes('Sign in')) {
-      return this.sendResponseToWorker(null);
-    }
 
     if (value === undefined) {
       const offButton = document.querySelector('[aria-label="Turn off"]');
