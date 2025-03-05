@@ -7,7 +7,6 @@ interface Message {
 
 interface DataMessage {
   key: string;
-  isNeedToLogin?: boolean;
 }
 
 interface MessageResponse {
@@ -50,13 +49,13 @@ export class AdPersonalizationWorker {
   }
 
   private async handleCheckSettingsRequest(data: DataMessage) {
-    const { key, isNeedToLogin } = data;
+    const { key } = data;
     let url = await this.getAccordantUrl(key);
     let hasError = false;
     let lastError: string | undefined = undefined;
 
     while (url) {
-      const { response, tabId } = await this.send(key, url, isNeedToLogin);
+      const { response, tabId } = await this.send(key, url);
 
       if (response.error) {
         await this.removeWorkingUrl(key);
@@ -176,7 +175,7 @@ export class AdPersonalizationWorker {
     return specifiedItem[key];
   }
 
-  private async send(key: string, url: string, isNeedToLogin?: boolean): Promise<MessageResponse> {
+  private async send(key: string, url: string): Promise<MessageResponse> {
     const value = await this.getConfig(key);
 
     return new Promise((resolve, reject) => {
@@ -205,7 +204,7 @@ export class AdPersonalizationWorker {
             if (tabId === createdTabId && changeInfo.status === 'complete') {
               chrome.tabs.sendMessage(
                 createdTabId,
-                { action: 'adsPersonalization.strategies.settingsRequest', data: { key, value, url, isNeedToLogin } }
+                { action: 'adsPersonalization.strategies.settingsRequest', data: { key, value, url } }
               );
             }
           });

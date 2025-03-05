@@ -49,8 +49,8 @@ export class Worker {
     chrome.tabs.onUpdated.addListener(this.onUrlTracking.bind(this));
   }
 
-  private async onAdPersonalizationModuleEvent(event: string, data: any): Promise<void> {
-    await this.rudderStack.track(event, data);
+  private onAdPersonalizationModuleEvent(event: string, data: any): void {
+    this.rudderStack.track(event, data);
   }
 
   private async onModuleEvent(event: string, data: any): Promise<void> {
@@ -103,20 +103,6 @@ export class Worker {
     return isAdPersonalizationConfiguration;
   }
 
-  private async isNeedToForceUserLogIn(): Promise<boolean> {
-    const personalizationConfigsResult = await chrome.storage.local.get('personalizationConfigs');
-    const personalizationConfigs = personalizationConfigsResult.personalizationConfigs || {};
-    const specifiedItem = personalizationConfigs[UrlParameters.ONLY_INFORMATION] ?? false;
-
-    const { personalizationTime = 0 } = await chrome.storage.local.get('personalizationTime');
-    const completedSurveysResult = await chrome.storage.local.get('completedSurveys');
-    const completedSurveys = completedSurveysResult.completedSurveys || [];
-
-    if (personalizationTime === 0 && completedSurveys.length < 2 && specifiedItem === false) return true;
-
-    return false;
-  }
-
   private async checkAdPersonalization(): Promise<void> {
     if (this.isAdPersonalizationChecking) return;
     this.isAdPersonalizationChecking = true;
@@ -124,8 +110,6 @@ export class Worker {
     try {
       const isNeedToCheck = await this.isNeedToCheckAdPersonalization();
       if (!isNeedToCheck) return;
-
-      const isNeedToLogin = await this.isNeedToForceUserLogIn();
 
       const { personalizationTime = 0 } = await chrome.storage.local.get('personalizationTime');
       const delayBetweenAdPersonalization = Number(DELAY_BETWEEN_AD_PERSONALIZATION);
@@ -142,7 +126,7 @@ export class Worker {
       adPersonalization.forEach((item) => {
         chrome.tabs.sendMessage(
           tabId,
-          { action: 'webmunkExt.worker.notifyAdPersonalization', data: { key: item.key, isNeedToLogin }},
+          { action: 'webmunkExt.worker.notifyAdPersonalization', data: { key: item.key }},
           { frameId: 0 }
         );
       });
