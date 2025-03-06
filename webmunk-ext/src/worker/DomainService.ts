@@ -27,6 +27,7 @@ export class DomainService {
     const excludedDomainsString = await this.configService.getConfigByKey('excludedDomains');
     const newDomains: string[] = excludedDomainsString ? JSON.parse(excludedDomainsString) : [];
 
+    await this.startDayTiming();
     await this.saveExcludedDomainsIfNeeded(newDomains);
   }
 
@@ -35,7 +36,7 @@ export class DomainService {
 
     if (!Object.keys(visits).length) return;
 
-    if (!(await this.isPassedOneDay())) return;
+    if (!(await this.isDayPassed())) return;
 
     await this.clearVisitedDomains();
     await this.initExcludedDomains();
@@ -68,14 +69,19 @@ export class DomainService {
     await chrome.storage.local.remove('excludedDomainVisits');
   }
 
-  private async isPassedOneDay(): Promise<boolean> {
-    const { excludedDomainsTracked = 0 } = await chrome.storage.local.get('excludedDomainsTracked');
+  private async startDayTiming(): Promise<void> {
     const currentDate = Date.now();
-    const oneDayDelay = Number(DELAY_BETWEEN_EXCLUDED_VISITED_DOMAINS);
+    let delay = Number(DELAY_BETWEEN_EXCLUDED_VISITED_DOMAINS);
 
-    if (currentDate < excludedDomainsTracked + oneDayDelay) return false;
+    const endTime = currentDate + delay;
 
-    await chrome.storage.local.set({ excludedDomainsTracked: currentDate });
-    return true;
+    await chrome.storage.local.set({ dayEndTime: endTime });
+  }
+
+  private async isDayPassed(): Promise<boolean> {
+    const { dayEndTime } = await chrome.storage.local.get('dayEndTime');
+    const currentTime = Date.now();
+
+    return currentTime >= dayEndTime;
   }
 }
