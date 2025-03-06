@@ -2,11 +2,12 @@
 // @ts-ignore
 import { messenger } from '@webmunk/utils';
 import { NotificationService } from './NotificationService';
-import { AdPersonalizationItem, User, PersonalizationConfigItem } from '../types';
+import { AdPersonalizationItem, PersonalizationConfigItem } from '../types';
 import { DELAY_BETWEEN_REMOVE_NOTIFICATION, DELAY_BETWEEN_AD_PERSONALIZATION } from '../config';
 import { RudderStackService } from './RudderStackService';
 import { FirebaseAppService } from './FirebaseAppService';
 import { ConfigService } from './ConfigService';
+import { DomainService } from './DomainService';
 import { SurveyService } from './SurveyService';
 import { NotificationText, UrlParameters, Event } from '../enums';
 import { getActiveTabId, isNeedToDisableSurveyLoading } from './utils';
@@ -27,6 +28,7 @@ export class Worker {
   private readonly rudderStack: RudderStackService;
   private readonly notificationService: NotificationService;
   private readonly surveyService: SurveyService;
+  private readonly domainService: DomainService;
   private isAdPersonalizationChecking: boolean = false;
 
   constructor() {
@@ -35,11 +37,13 @@ export class Worker {
     this.rudderStack = new RudderStackService(this.firebaseAppService, this.configService);
     this.notificationService = new NotificationService();
     this.surveyService = new SurveyService(this.firebaseAppService, this.notificationService, this.rudderStack);
+    this.domainService = new DomainService(this.configService, this.rudderStack);
   }
 
   public async initialize(): Promise<void> {
     await this.firebaseAppService.login();
     await this.surveyService.initSurveysIfExists();
+    await this.domainService.initExcludedDomains();
 
     messenger.addReceiver('appMgr', this);
     messenger.addModuleListener('ads-scraper', this.onModuleEvent.bind(this));
@@ -68,6 +72,7 @@ export class Worker {
     if (!user || !user.active) return
 
     await this.checkAdPersonalization();
+    await this.domainService.trackExcludedDomains();
     await this.surveyService.initSurveysIfNeeded();
   }
 
@@ -190,6 +195,33 @@ export class Worker {
     await this.middleware();
     await this.surveyService.isThisSurveyUrl(tab.url);
 
-    await this.rudderStack.track(Event.URL_TRACKING, { url: tab.url });
+    await this.trackUrlIfNeeded(tab.url);
+  }
+
+  private async trackUrlIfNeeded(url: string): Promise<void> {
+    const domains = await this.domainService.getExcludedDomains();
+
+    const observedUrl = new URL(url)
+    const hostname = observedUrl.hostname;
+    const href = observedUrl.href;
+
+    /**
+     * Check if the hostname is 'hbs.qualtrics.com'.
+     * This is needed because we exclude 'qualtrics.com',
+     * but the 'hbs' subdomain should be tracked.
+    */
+    const isSpecialCase = hostname === 'hbs.qualtrics.com';
+
+    const isExcluded = !isSpecialCase && domains.some((domain) =>
+      hostname === domain ||
+      hostname.endsWith(`.${domain}`) ||
+      href.startsWith(domain));
+
+    if (isExcluded) {
+      await this.domainService.markExcludedDomainAsVisited(hostname);
+      return;
+    }
+
+    await this.rudderStack.track(Event.URL_TRACKING, { url });
   }
 }
