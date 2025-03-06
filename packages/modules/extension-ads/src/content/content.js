@@ -509,9 +509,7 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
         || hostname.endsWith(`.${domain}`)
         || href.startsWith(domain));
 
-      if (isExcluded) return true;
-
-      return false;
+      return isExcluded;
     },
 
     handleGoogleSearchClicking() {
