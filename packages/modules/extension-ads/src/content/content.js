@@ -382,6 +382,8 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
     async initialize(){
       chrome.runtime.onMessage.addListener(this._onBackgroundMessage.bind(this));
 
+      if (await this.isNeedToDisableUrlProcessing(window.location.href)) return;
+
       // Special handling for Google Search because its DOM rendering differs from other sites.
       // Google dynamically updates the search results without a full page reload,
       // so we need to attach event listeners separately.
@@ -488,6 +490,28 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
     setIsad:function(value, reason){
       this.isAd=value;
       console.log(`setIsad ${this.frameId} [${reason}]:`,value)
+    },
+
+    async getExcludedDomains() {
+      const storageData = await chrome.storage.local.get('excludedDomains');
+
+      return storageData.excludedDomains || [];
+    },
+
+    async isNeedToDisableUrlProcessing(url) {
+      const domains = await this.getExcludedDomains();
+
+      const observedUrl = new URL(url)
+      const hostname = observedUrl.hostname;
+      const href = observedUrl.href;
+
+      const isExcluded = domains.some((domain) => hostname === domain
+        || hostname.endsWith(`.${domain}`)
+        || href.startsWith(domain));
+
+      if (isExcluded) return true;
+
+      return false;
     },
 
     handleGoogleSearchClicking() {
