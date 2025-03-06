@@ -183,31 +183,56 @@ export class AdPersonalizationWorker {
 
       const messageListener = (message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
         if (message.action === 'adsPersonalization.strategies.settingsResponse' && sender.tab?.id === createdTabId) {
-          chrome.runtime.onMessage.removeListener(messageListener);
+          removeListeners();
           resolve({ response: message.response, tabId: sender.tab.id });
         }
       };
 
-      chrome.runtime.onMessage.addListener(messageListener);
+      const tabCloseListener = (closedTabId: number) => {
+        if (closedTabId !== createdTabId) return;
 
-      chrome.tabs.create({ url: url, active: false }, (tab) => {
+        removeListeners();
+        monitorTabListener();
+      };
+
+      const monitorTabListener = () => {
+        this.createAndMonitorTab(url, key, value)
+          .then((tabId) => {
+            createdTabId = tabId;
+            addListeners();
+          })
+          .catch(reject);
+      };
+
+      monitorTabListener();
+
+      const addListeners = () => {
+        chrome.runtime.onMessage.addListener(messageListener);
+        chrome.tabs.onRemoved.addListener(tabCloseListener);
+      };
+
+      const removeListeners = () => {
+        chrome.runtime.onMessage.removeListener(messageListener);
+        chrome.tabs.onRemoved.removeListener(tabCloseListener);
+      }
+    });
+  }
+
+  private createAndMonitorTab(url: string, key: string, value: string | boolean): Promise<number> {
+    return new Promise((resolve, reject) => {
+      chrome.tabs.create({ url, active: true }, (tab) => {
         if (tab && tab.id) {
-          createdTabId = tab.id;
-
-          // Facebook doesn't work in the background,
-          // so it is necessary for the Facebook tab to be active for proper functionality.
-          if (url.includes(Url.FACEBOOK)) {
-            chrome.tabs.update(createdTabId, { active: true });
-          }
-
-          chrome.tabs.onUpdated.addListener((tabId: number, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
-            if (tabId === createdTabId && changeInfo.status === 'complete') {
-              chrome.tabs.sendMessage(
-                createdTabId,
-                { action: 'adsPersonalization.strategies.settingsRequest', data: { key, value, url } }
-              );
+          chrome.tabs.onUpdated.addListener(function tabUpdateListener(tabId, changeInfo) {
+            if (tabId === tab.id && changeInfo.status === 'complete') {
+              chrome.tabs.sendMessage(tab.id, {
+                action: 'adsPersonalization.strategies.settingsRequest',
+                data: { key, value, url },
+              });
             }
           });
+          resolve(tab.id);
+        } else {
+          reject(new Error('Failed to create tab'));
         }
       });
     });
