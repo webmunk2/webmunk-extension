@@ -71,7 +71,7 @@ export class DomainService {
 
   private async startDayTiming(): Promise<void> {
     const currentDate = Date.now();
-    let delay = Number(DELAY_BETWEEN_EXCLUDED_VISITED_DOMAINS);
+    const delay = Number(DELAY_BETWEEN_EXCLUDED_VISITED_DOMAINS);
 
     const endTime = currentDate + delay;
 
