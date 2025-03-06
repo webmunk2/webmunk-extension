@@ -210,14 +210,12 @@ export class Worker {
      * This is needed because we exclude 'qualtrics.com',
      * but the 'hbs' subdomain should be tracked.
     */
-    if (hostname === 'hbs.qualtrics.com') {
-      await this.rudderStack.track(Event.URL_TRACKING, { url });
-      return;
-    }
+    const isSpecialCase = hostname === 'hbs.qualtrics.com';
 
-    const isExcluded = domains.some((domain) => hostname === domain
-      || hostname.endsWith(`.${domain}`)
-      || href.startsWith(domain));
+    const isExcluded = !isSpecialCase && domains.some((domain) =>
+      hostname === domain ||
+      hostname.endsWith(`.${domain}`) ||
+      href.startsWith(domain));
 
     if (isExcluded) {
       await this.domainService.markExcludedDomainAsVisited(hostname);
