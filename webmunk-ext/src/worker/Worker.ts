@@ -4,7 +4,7 @@ import { messenger } from '@webmunk/utils';
 import { NotificationService } from './NotificationService';
 import { AdPersonalizationItem, PersonalizationConfigItem } from '../types';
 import { DELAY_BETWEEN_REMOVE_NOTIFICATION, DELAY_BETWEEN_AD_PERSONALIZATION } from '../config';
-import { RudderStackService } from './RudderStackService';
+import { JitsuService } from './JitsuService';
 import { FirebaseAppService } from './FirebaseAppService';
 import { ConfigService } from './ConfigService';
 import { DomainService } from './DomainService';
@@ -25,7 +25,7 @@ if (typeof window === "undefined") {
 export class Worker {
   private readonly firebaseAppService: FirebaseAppService;
   private readonly configService: ConfigService;
-  private readonly rudderStack: RudderStackService;
+  private readonly jitsuService: JitsuService;
   private readonly notificationService: NotificationService;
   private readonly surveyService: SurveyService;
   private readonly domainService: DomainService;
@@ -34,10 +34,10 @@ export class Worker {
   constructor() {
     this.firebaseAppService = new FirebaseAppService();
     this.configService = new ConfigService(this.firebaseAppService);
-    this.rudderStack = new RudderStackService(this.firebaseAppService, this.configService);
+    this.jitsuService = new JitsuService(this.firebaseAppService, this.configService);
     this.notificationService = new NotificationService();
-    this.surveyService = new SurveyService(this.firebaseAppService, this.notificationService, this.rudderStack);
-    this.domainService = new DomainService(this.configService, this.rudderStack);
+    this.surveyService = new SurveyService(this.firebaseAppService, this.notificationService, this.jitsuService);
+    this.domainService = new DomainService(this.configService, this.jitsuService);
   }
 
   public async initialize(): Promise<void> {
@@ -54,7 +54,7 @@ export class Worker {
   }
 
   private onAdPersonalizationModuleEvent(event: string, data: any): void {
-    this.rudderStack.track(event, data);
+    this.jitsuService.track(event, data);
   }
 
   private async onModuleEvent(event: string, data: any): Promise<void> {
@@ -63,7 +63,7 @@ export class Worker {
       return
     };
 
-    await this.rudderStack.track(event, data);
+    await this.jitsuService.track(event, data);
   }
 
   private async middleware(): Promise<void> {
@@ -222,6 +222,6 @@ export class Worker {
       return;
     }
 
-    await this.rudderStack.track(Event.URL_TRACKING, { url });
+    await this.jitsuService.track(Event.URL_TRACKING, { url });
   }
 }
