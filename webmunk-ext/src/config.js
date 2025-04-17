@@ -1,6 +1,6 @@
 export const WEBMUNK_URL = process.env?.WEBMUNK_URL;
-export const RUDDERSTACK_WRITE_KEY = process.env?.RUDDERSTACK_WRITE_KEY;
-export const RUDDERSTACK_DATA_PLANE = process.env?.RUDDERSTACK_DATA_PLANE;
+export const JITSU_WRITE_KEY = process.env?.JITSU_WRITE_KEY;
+export const JITSU_INGEST_URL = process.env?.JITSU_INGEST_URL;
 export const FIREBASE_CONFIG = {
   apiKey: process.env?.FIREBASE_API_KEY,
   authDomain: `${process.env?.FIREBASE_PROJECT_ID}.firebaseapp.com`,

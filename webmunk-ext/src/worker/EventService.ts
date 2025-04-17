@@ -1,17 +1,17 @@
 import 'setimmediate';
-import { Analytics } from '@rudderstack/analytics-js-service-worker';
-import { RUDDERSTACK_DATA_PLANE, RUDDERSTACK_WRITE_KEY } from '../config';
+import { jitsuAnalytics } from "@jitsu/js";
+import { JITSU_WRITE_KEY, JITSU_INGEST_URL } from '../config';
 import { FirebaseAppService } from './FirebaseAppService';
 import { ConfigService } from './ConfigService';
 
-export class RudderStackService {
-  private client: Analytics;
+export class EventService {
+  private client: any;
 
   constructor(
     private readonly firebaseAppService: FirebaseAppService,
     private readonly configService: ConfigService
   ) {
-    this.client = new Analytics(RUDDERSTACK_WRITE_KEY, RUDDERSTACK_DATA_PLANE);
+    this.client = jitsuAnalytics({ writeKey: JITSU_WRITE_KEY, host: JITSU_INGEST_URL, cookie_policy: "none" })
   }
 
   async track(event: string, properties: any): Promise<void> {
@@ -28,18 +28,15 @@ export class RudderStackService {
       return;
     }
 
-    return new Promise((resolve, reject) => {
-      this.client.track({
+    this.client.identify(user.uid, { $doNotSend: true });
+
+    try {
+      await this.client.track({
         event,
-        properties,
-        userId: user.uid,
-      }, (err, data) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(data);
-        }
+        ...properties,
       });
-    });
+    } catch (err) {
+      console.error('Failed to send event:', err);
+    }
   }
 }

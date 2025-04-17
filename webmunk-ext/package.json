@@ -4,7 +4,7 @@
   "private": true,
   "dependencies": {
     "@corex/deepmerge": "^2.6.148",
-    "@rudderstack/analytics-js-service-worker": "^3.1.2",
+    "@jitsu/js": "^1.9.17",
     "@webmunk/ad-personalization": "file:../packages/modules/ad-personalization",
     "@webmunk/cookies-scraper": "file:../packages/modules/cookies",
     "@webmunk/extension-ads": "file:../packages/modules/extension-ads",
