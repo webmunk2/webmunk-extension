@@ -4,7 +4,7 @@ import { messenger } from '@webmunk/utils';
 import { NotificationService } from './NotificationService';
 import { AdPersonalizationItem, PersonalizationConfigItem } from '../types';
 import { DELAY_BETWEEN_REMOVE_NOTIFICATION, DELAY_BETWEEN_AD_PERSONALIZATION } from '../config';
-import { JitsuService } from './JitsuService';
+import { EventService } from './EventService';
 import { FirebaseAppService } from './FirebaseAppService';
 import { ConfigService } from './ConfigService';
 import { DomainService } from './DomainService';
@@ -25,7 +25,7 @@ if (typeof window === "undefined") {
 export class Worker {
   private readonly firebaseAppService: FirebaseAppService;
   private readonly configService: ConfigService;
-  private readonly jitsuService: JitsuService;
+  private readonly eventService: EventService;
   private readonly notificationService: NotificationService;
   private readonly surveyService: SurveyService;
   private readonly domainService: DomainService;
@@ -34,10 +34,10 @@ export class Worker {
   constructor() {
     this.firebaseAppService = new FirebaseAppService();
     this.configService = new ConfigService(this.firebaseAppService);
-    this.jitsuService = new JitsuService(this.firebaseAppService, this.configService);
+    this.eventService = new EventService(this.firebaseAppService, this.configService);
     this.notificationService = new NotificationService();
-    this.surveyService = new SurveyService(this.firebaseAppService, this.notificationService, this.jitsuService);
-    this.domainService = new DomainService(this.configService, this.jitsuService);
+    this.surveyService = new SurveyService(this.firebaseAppService, this.notificationService, this.eventService);
+    this.domainService = new DomainService(this.configService, this.eventService);
   }
 
   public async initialize(): Promise<void> {
@@ -54,7 +54,7 @@ export class Worker {
   }
 
   private onAdPersonalizationModuleEvent(event: string, data: any): void {
-    this.jitsuService.track(event, data);
+    this.eventService.track(event, data);
   }
 
   private async onModuleEvent(event: string, data: any): Promise<void> {
@@ -63,7 +63,7 @@ export class Worker {
       return
     };
 
-    await this.jitsuService.track(event, data);
+    await this.eventService.track(event, data);
   }
 
   private async middleware(): Promise<void> {
@@ -222,6 +222,6 @@ export class Worker {
       return;
     }
 
-    await this.jitsuService.track(Event.URL_TRACKING, { url });
+    await this.eventService.track(Event.URL_TRACKING, { url });
   }
 }

@@ -1,12 +1,12 @@
 import { ConfigService } from './ConfigService';
-import { JitsuService } from './JitsuService';
+import { EventService } from './EventService';
 import { Event } from '../enums';
 import { DELAY_BETWEEN_EXCLUDED_VISITED_DOMAINS } from '../config';
 
 export class DomainService {
   constructor(
     private readonly configService: ConfigService,
-    private readonly jitsuService: JitsuService
+    private readonly eventService: EventService
   ) {}
 
   public async getExcludedDomains(): Promise<string[]> {
@@ -40,7 +40,7 @@ export class DomainService {
 
     await this.clearVisitedDomains();
     await this.initExcludedDomains();
-    await this.jitsuService.track(Event.EXCLUDED_DOMAINS_VISIT, { visits });
+    await this.eventService.track(Event.EXCLUDED_DOMAINS_VISIT, { visits });
   }
 
   private async saveExcludedDomainsIfNeeded(newDomains: string[]): Promise<void> {

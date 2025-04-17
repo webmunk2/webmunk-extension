@@ -4,7 +4,7 @@ import { WEBMUNK_URL } from '../config';
 import { NotificationService } from './NotificationService';
 import { NotificationText, UrlParameters } from '../enums';
 import { DELAY_BETWEEN_SURVEY, DELAY_BETWEEN_FILL_OUT_NOTIFICATION, DELAY_WHILE_AD_BLOCKER } from '../config';
-import { JitsuService } from './JitsuService';
+import { EventService } from './EventService';
 import { getActiveTabId, isNeedToDisableSurveyLoading } from './utils';
 import { FirebaseAppService } from './FirebaseAppService';
 
@@ -21,7 +21,7 @@ export class SurveyService {
   constructor(
     private readonly firebaseAppService: FirebaseAppService,
     private readonly notificationService: NotificationService,
-    private readonly jitsuService: JitsuService
+    private readonly eventService: EventService
   ) {
     chrome.tabs.onUpdated.addListener(this.surveyCompleteListener.bind(this));
     this.configService = new ConfigService(this.firebaseAppService);
@@ -202,7 +202,7 @@ export class SurveyService {
       await this.configurationManipulation(tab.url);
 
       await this.startWeekTiming();
-      await this.jitsuService.track(events.SURVEY_COMPLETED, { surveyUrl: openerTabUrl });
+      await this.eventService.track(events.SURVEY_COMPLETED, { surveyUrl: openerTabUrl });
     }
   }
 
@@ -242,7 +242,7 @@ export class SurveyService {
     if (!this.surveys.some((survey) => survey.url === url)) return;
 
     await this.recordCookiesIfNeeded();
-    await this.jitsuService.track(events.SURVEY_STARTED, { surveyUrl: url });
+    await this.eventService.track(events.SURVEY_STARTED, { surveyUrl: url });
   }
 
   public async recordCookiesIfNeeded(): Promise<void> {

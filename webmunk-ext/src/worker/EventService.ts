@@ -4,7 +4,7 @@ import { JITSU_WRITE_KEY, JITSU_INGEST_URL } from '../config';
 import { FirebaseAppService } from './FirebaseAppService';
 import { ConfigService } from './ConfigService';
 
-export class JitsuService {
+export class EventService {
   private client: any;
 
   constructor(
