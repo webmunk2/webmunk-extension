@@ -18,6 +18,7 @@ type AdData = {
   text: string;
   content: Array<{ src?: string; href?: string; type: string }>;
   coordinates: any;
+  redirectedUrl: string | null
 };
 
 type ProcessedAdData = {
@@ -178,7 +179,7 @@ export class ExtensionAdsWorker {
     return !!url && !filters.some((filter) => url.includes(filter));
   }
 
-  private async processAdData({ title, text, content, coordinates, adId }: { title: string; text: string; content: any; coordinates: any; adId: string },
+  private async processAdData({ title, text, content, coordinates, adId, redirectedUrl }: AdData,
     tabUrl: string,
     clickedUrl?: string | null
     ): Promise<ProcessedAdData | void>  {
@@ -231,7 +232,7 @@ export class ExtensionAdsWorker {
       coordinates,
       initialUrl: mainContentItem.initialUrl,
       redirected: mainContentItem.redirected,
-      redirectedUrl: mainContentItem.redirectedUrl,
+      redirectedUrl,
       content: filteredProcessedContent,
     };
   }
@@ -345,7 +346,7 @@ export class ExtensionAdsWorker {
 
     if (this.lastClickTime && now - this.lastClickTime < 1000) {
       return;
-  }
+    }
 
     this.lastClickTime = now;
 

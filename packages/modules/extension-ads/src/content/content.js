@@ -917,8 +917,9 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
       const { title, text } = this.extractTexts(frameId, element);
       const content = this.extractContent(frameId, element);
       const coordinates = await this.getAdsCoordinates(element);
+      const redirectedUrl = this.getClickedUrl(element);
 
-      return { title, text, content, coordinates, adId };
+      return { title, text, content, coordinates, adId, redirectedUrl };
     },
 
     async addClickListenersToElements(frameId, elem, adId) {
@@ -934,21 +935,32 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
         let hoveredElement = document.elementFromPoint(clientX, clientY);
         if (!hoveredElement) return;
 
-        const closestLink = hoveredElement.tagName === 'A'
-          ? hoveredElement
-          : hoveredElement.closest('a');
-
-        clickedUrl = closestLink?.href || null;
-
-        if (!clickedUrl) {
-          clickedUrl = this.getClosestLink(hoveredElement);
-        }
+        clickedUrl = this.getClickedUrl(hoveredElement);
 
         chrome.runtime.sendMessage({
           action: this.getMainAppMgrName() + '.adClicked',
           data: { clickedUrl, adId }
         });
       });
+    },
+
+    isInvalidLink(url) {
+      return url.includes('adssettings') || url.includes('support');
+    },
+
+    getClickedUrl(adElement) {
+      if (!adElement) return null;
+
+      const link = adElement.tagName === 'A'
+        ? adElement
+        : adElement.querySelector('a') || adElement.closest('a');
+
+      if (link?.href && !this.isInvalidLink(link.href)) return link.href;
+
+      const fallbackLink = this.getClosestLink(adElement);
+      if (fallbackLink) return fallbackLink;
+
+      return null;
     },
 
     async makeCloneIfNeeded(element) {
@@ -980,7 +992,7 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
 
     getClosestLink(element) {
       while (element) {
-        if (element.tagName === 'A' && element.href) {
+        if (element.tagName === 'A' && element.href && !this.isInvalidLink(element.href)) {
           return element.href;
         }
 
@@ -991,9 +1003,11 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
           return element.src;
         }
 
-        const nestedLink = element.querySelector('a[href]');
-        if (nestedLink) {
-          return nestedLink.href;
+        const allLinks = element.querySelectorAll('a[href]');
+        for (const link of allLinks) {
+          if (!this.isInvalidLink(link.href)) {
+            return link.href;
+          }
         }
 
         const nestedVideo = element.querySelector('video[src]');
