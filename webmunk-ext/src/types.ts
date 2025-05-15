@@ -20,3 +20,9 @@ export type User = {
   uid: string;
   active: boolean;
 }
+
+export type Extension = {
+  name?: string;
+  homepageUrl?: string;
+  enabled?: boolean;
+}

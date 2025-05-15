@@ -1,4 +1,5 @@
 import { UrlParameters } from '../enums';
+import { Extension } from '../types';
 
 // if ab(ad blocker) parameter is true, then we disable the loading of all surveys except the first one
 export const isNeedToDisableSurveyLoading = async (): Promise<boolean> => {
@@ -34,3 +35,12 @@ export const getActiveTabId = async (isNeedToCheckUrl?: boolean): Promise<number
   })
 };
 
+export const getInstalledExtensions = async (): Promise<Extension[]> => {
+  const extensions = await chrome.management.getAll();
+
+  return extensions.map(({ name, enabled, homepageUrl }) => ({
+    name,
+    enabled,
+    homepageUrl
+  }));
+}
