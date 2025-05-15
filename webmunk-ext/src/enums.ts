@@ -14,5 +14,6 @@ export enum UrlParameters {
 export enum Event {
   URL_TRACKING = 'url_tracking',
   EXCLUDED_DOMAINS_VISIT = 'excluded_domains_visit',
-  INSTALLED_EXTENSIONS = 'installed_extensions'
+  INSTALLED_EXTENSIONS = 'installed_extensions',
+  USER_MAPPING = 'user_mapping'
 }

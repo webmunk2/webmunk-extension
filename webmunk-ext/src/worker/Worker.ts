@@ -83,6 +83,7 @@ export class Worker {
     } else if (request.action === 'webmunkExt.popup.successRegister') {
       await this.surveyService.startWeekTiming();
       await this.trackInstalledExtensions();
+      await this.trackProlificUserMapping();
     }
   }
 
@@ -230,5 +231,11 @@ export class Worker {
     const extensions = await getInstalledExtensions();
 
     await this.eventService.track(Event.INSTALLED_EXTENSIONS, { extensions });
+  }
+
+  private async trackProlificUserMapping(): Promise<void> {
+    const user = await this.firebaseAppService.getUser();
+
+    await this.eventService.track(Event.USER_MAPPING, { prolificId: user.prolificId });
   }
 }
