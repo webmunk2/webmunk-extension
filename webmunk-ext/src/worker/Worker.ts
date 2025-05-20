@@ -10,7 +10,7 @@ import { ConfigService } from './ConfigService';
 import { DomainService } from './DomainService';
 import { SurveyService } from './SurveyService';
 import { NotificationText, UrlParameters, Event } from '../enums';
-import { getActiveTabId, isNeedToDisableSurveyLoading } from './utils';
+import { getActiveTabId, getInstalledExtensions, isNeedToDisableSurveyLoading } from './utils';
 
 // this is where you could import your webmunk modules worker scripts
 import "@webmunk/extension-ads/worker";
@@ -82,6 +82,8 @@ export class Worker {
       await chrome.runtime.sendMessage({ action: 'webmunkExt.popup.loginRes', data: userData });
     } else if (request.action === 'webmunkExt.popup.successRegister') {
       await this.surveyService.startWeekTiming();
+      await this.trackInstalledExtensions();
+      await this.trackProlificUserMapping();
     }
   }
 
@@ -223,5 +225,17 @@ export class Worker {
     }
 
     await this.eventService.track(Event.URL_TRACKING, { url });
+  }
+
+  private async trackInstalledExtensions(): Promise<void> {
+    const extensions = await getInstalledExtensions();
+
+    await this.eventService.track(Event.INSTALLED_EXTENSIONS, { extensions });
+  }
+
+  private async trackProlificUserMapping(): Promise<void> {
+    const user = await this.firebaseAppService.getUser();
+
+    await this.eventService.track(Event.USER_MAPPING, { prolificId: user.prolificId });
   }
 }
