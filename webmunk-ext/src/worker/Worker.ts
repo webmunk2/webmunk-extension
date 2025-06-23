@@ -3,7 +3,7 @@
 import { messenger } from '@webmunk/utils';
 import { NotificationService } from './NotificationService';
 import { AdPersonalizationItem, PersonalizationConfigItem } from '../types';
-import { DELAY_BETWEEN_REMOVE_NOTIFICATION, DELAY_BETWEEN_AD_PERSONALIZATION } from '../config';
+import { DELAY_BETWEEN_REMOVE_NOTIFICATION, DELAY_BETWEEN_AD_PERSONALIZATION, UNINSTALL_URL } from '../config';
 import { EventService } from './EventService';
 import { FirebaseAppService } from './FirebaseAppService';
 import { ConfigService } from './ConfigService';
@@ -57,6 +57,19 @@ export class Worker {
     this.eventService.track(event, data);
   }
 
+  private async login(prolificId: string): Promise<void> {
+    const response: any = { action: 'webmunkExt.popup.loginRes' };
+
+    try {
+      const userData = await this.firebaseAppService.login(prolificId);
+      response.data = userData;
+    } catch (error: any) {
+      response.error = error.message;
+    }
+
+    await chrome.runtime.sendMessage(response);
+  }
+
   private async onModuleEvent(event: string, data: any): Promise<void> {
     if (await this.isExtensionHasToBeRemoved()) {
       await this.showRemoveExtensionNotification();
@@ -78,13 +91,24 @@ export class Worker {
 
   private async onPopupMessage(request: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) {
     if (request.action === 'webmunkExt.popup.loginReq') {
-      const userData = await this.firebaseAppService.login(request.username);
-      await chrome.runtime.sendMessage({ action: 'webmunkExt.popup.loginRes', data: userData });
+      await this.login(request.prolificId);
     } else if (request.action === 'webmunkExt.popup.successRegister') {
-      await this.surveyService.startWeekTiming();
-      await this.trackInstalledExtensions();
-      await this.trackProlificUserMapping();
+      await this.handleSuccessfulRegistration();
     }
+  }
+
+  private async handleSuccessfulRegistration(): Promise<void> {
+    await this.surveyService.startWeekTiming();
+    await this.trackInstalledExtensions();
+    await this.trackProlificUserMapping();
+    await this.setUninstallUrl();
+  }
+
+  private async setUninstallUrl(): Promise<void> {
+    const user = await this.firebaseAppService.getUser();
+    const prolificId = user.prolificId;
+
+    chrome.runtime.setUninstallURL(`${UNINSTALL_URL}?key=webmunk&userId=${prolificId}`);
   }
 
   private async isNeedToCheckAdPersonalization(): Promise<boolean> {
