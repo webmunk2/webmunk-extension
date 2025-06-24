@@ -1,4 +1,5 @@
 export const WEBMUNK_URL = process.env?.WEBMUNK_URL;
+export const UNINSTALL_URL = process.env?.UNINSTALL_URL;
 export const JITSU_WRITE_KEY = process.env?.JITSU_WRITE_KEY;
 export const JITSU_INGEST_URL = process.env?.JITSU_INGEST_URL;
 export const FIREBASE_CONFIG = {

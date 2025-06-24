@@ -42,7 +42,11 @@ export class FirebaseAppService {
       await chrome.storage.local.set({ user: this.user });
 
       return this.user;
-    } catch (e) {
+    } catch (e: any) {
+      if (e.code.includes('already-exists')) {
+        throw new Error(e.message);
+      }
+
       console.log(e);
     }
   }

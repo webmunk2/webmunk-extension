@@ -43,16 +43,20 @@ class Popup {
 
     this.setButtonState(true, 'Wait...');
 
-    const user: User = await this.login(inputValue);
+    try {
+      const user: User = await this.login(inputValue);
 
-    if (!user) {
-      this.notification.warning('Enrollment hiccup!\nPlease give it another shot a bit later. We appreciate your patience!');
+      await chrome.runtime.sendMessage({ action: 'webmunkExt.popup.successRegister' });
+      setTimeout(() => this.showStudyExtensionContainer(user.uid), 100);
+    } catch (error: any) {
+      const message =
+        typeof error === 'string'
+          ? error
+          : 'Enrollment hiccup!\nPlease give it another shot a bit later. We appreciate your patience!';
+
+      this.notification.warning(message);
       this.setButtonState(false, 'Continue');
-      return;
     }
-
-    await chrome.runtime.sendMessage({ action: 'webmunkExt.popup.successRegister' });
-    setTimeout(() => this.showStudyExtensionContainer(user.uid), 100);
   }
 
   private validateInput(inputValue: string): boolean {
@@ -71,18 +75,22 @@ class Popup {
     return true;
   }
 
-  private async login(username: string): Promise<User> {
-    return new Promise((resolve) => {
+  private async login(prolificId: string): Promise<User> {
+    return new Promise((resolve, reject) => {
       const messageHandler = (response: any) => {
         if (response.action === 'webmunkExt.popup.loginRes') {
-          resolve(response.data);
           chrome.runtime.onMessage.removeListener(messageHandler);
+
+          if (response.error) {
+            reject(response.error);
+          } else {
+            resolve(response.data);
+          }
         }
       };
 
       chrome.runtime.onMessage.addListener(messageHandler);
-
-      chrome.runtime.sendMessage({ action: 'webmunkExt.popup.loginReq', username });
+      chrome.runtime.sendMessage({ action: 'webmunkExt.popup.loginReq', prolificId });
     });
    }
 
