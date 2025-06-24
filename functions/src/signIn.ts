@@ -9,7 +9,7 @@ export const signIn = onCall<{ prolificId: string }>(async (request) => {
   const { prolificId } = request.data;
 
   if (!sessionUid || !prolificId) {
-    throw new HttpsError('invalid-argument', 'Invalid arguments: sessionUid and prolificId are required.');
+    throw new HttpsError('invalid-argument', 'Invalid arguments: Uid and prolificId are required.');
   }
 
   try {
