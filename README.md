@@ -1,18 +1,19 @@
-# Create Webmunk Extension
+## Extension-Specific Instructions
 
-## Installation
-`npm i --g create-webmunk-ext`
+Inside the `webmunk-ext` directory, you will find a dedicated `README.md` file. It contains:
 
-## Creating a new extension
-`create-webmunk-ext myext`
+- Modules used in the extension
+- Installation instructions
+- Development and testing setup details
 
-will create a directory myext, intialize a git repo and create a complete file arborescence.
-By default, the webpack build template will be used, meaning that you'll get a few webpack configuration files to build your new extension.
+Make sure to read it carefully when working on or contributing to the extension.
 
-## Adding Webmunk modules to your extension
-You'll need to install each of the modules you want to reuse in your extension:
-`npm install @webmunk/${extension_module}`
-And in the src
+## Additional Setup: Jitsu, BigQuery & Firebase
 
-## Generating your extension in the webpack template case.
-`npm run addon:dev:hot`
+For setting up **Jitsu**, **BigQuery**, and **Firebase** integration, refer to the file:
+
+```
+jitsu-bigquery-firebase-setup.md
+```
+
+This guide will walk you through how to deploy and configure these services, and how to integrate them into your extension using the Jitsu SDK.
