@@ -1,0 +1,30 @@
+{
+    "update_url": "https://clients2.google.com/service/update2/crx",
+    "manifest_version": 3,
+	"name": "webmunk extension",
+	"version": "0.1.0",
+
+	"description": "A new webmunk project",
+
+    "minimum_chrome_version": "88",
+    "permissions": [
+                    ],
+    "host_permissions": ["<all_urls>"],
+
+	"background": { "service_worker": "background.js" },
+    "content_scripts": [
+        {
+            "matches": [ "<all_urls>" ],
+            "js": ["content.js"],
+            "run_at": "document_start",
+            "all_frames": true ,
+            "match_about_blank": true
+        }
+    ],
+    "web_accessible_resources" :[
+        {
+            "resources": ["assets/web_accessible_resources/*", "pages/*", "images/*"],
+             "matches": ["<all_urls>"]
+        }
+    ]
+}

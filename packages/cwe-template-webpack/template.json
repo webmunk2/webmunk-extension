@@ -1,0 +1,41 @@
+{
+  "package": {
+    "dependencies": {
+      "@babel/cli": "^7.1.5",
+      "@babel/core": "^7.23.2",
+      "@babel/plugin-transform-class-properties": "^7.1.0",
+      "@babel/plugin-transform-nullish-coalescing-operator": "^7.18.6",
+      "@babel/plugin-transform-optional-chaining": "^7.21.0",
+      "@babel/plugin-syntax-dynamic-import": "^7.0.0",
+      "@babel/preset-env": "^7.22.14",
+      "@babel/preset-react": "^7.0.0",
+      "@types/styled-components": "^5.1.26",
+      "babel-core": "^7.0.0-bridge.0",
+      "babel-loader": "^9.1.3",
+      "@babel/eslint-parser": "^7.22.15",
+      "babel-jest": "^23.6.0",
+      "babel-plugin-dynamic-import-node": "^2.2.0",
+      "dotenv": "^8.2.0",
+      "fs": "0.0.1-security",
+      "git-revision-webpack-plugin": "^5.0.0",
+      "html-webpack-plugin": "^5.5.3",
+      "copy-webpack-plugin": "^11.0.0",
+      "webpack-extension-manifest-plugin": "^0.7.0",
+      "webpack-merge": "^5.4.0",
+      "webpack-preprocessor-loader": "^1.1.3",
+      "zip-webpack-plugin": "^4.0.1",
+      "@corex/deepmerge": "^2.6.34",
+      "babel-preset-env": "^1.7.0",
+      "core-js": "^3.33.2",
+      "webpack": "^5.89.0",
+      "webpack-cli": "^5.1.4",
+      "lodash": "^4.17.21",
+      "@webmunk/utils": "^1.0.19"
+    },
+    "scripts": {
+      "addon:dev:hot": "MANIFEST_VERSION=3 BUILD_ENV=development webpack --config webpack.addon.config.dev.js --watch",
+      "addon:build:dev": "MANIFEST_VERSION=3 BUILD_ENV=development webpack --config webpack.addon.chrome.config.devzip.js",
+      "addon:build:prod": "MANIFEST_VERSION=3 BUILD_ENV=production webpack --config webpack.addon.chrome.config.prod.js"  
+    }
+  }
+}

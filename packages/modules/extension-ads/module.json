@@ -1,0 +1,12 @@
+{
+  "name": "Ad Scraper",
+  "permissions": [{"name":"webRequest","justification":"to be reviewed"},
+                  {"name":"storage","justification":"store all filter dictionaries"},
+                  {"name":"unlimitedStorage","justification":"filters size goes beyond 5M"},
+                  {"name":"webNavigation","justification":"required for iframes management"},
+                  {"name":"alarms","justification":"session management and cleaning"},
+                  {"name":"privacy","justification":"used by ublock to customize network and services settings"},
+                  {"name": "activeTab", "justification": "gives an extension temporary access to the currently active tab"}
+                ],
+  "host_permissions": []
+}

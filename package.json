@@ -1,0 +1,26 @@
+{
+  "name": "webmunk",
+  "version": "1.0.8",
+  "description": "webmunk",
+  "workspaces": [
+    "functions/*",
+    "packages/*",
+    "packages/modules/*"
+  ],
+  "keywords": [],
+  "license": "GPL-2.0-or-later",
+  "main": "scripts/mergeManifests.js",
+  "scripts": {
+    "publish:all":"npm run publish -ws"
+  },
+  "dependencies": {
+    "@webmunk/manifest-merge": "^5.10.0",
+    "child_process": "^1.0.2",
+    "fs-extra": "^11.1.1",
+    "lodash": "^4.17.21",
+    "os": "^0.1.2",
+    "path": "^0.12.7",
+    "react-dev-utils": "^12.0.1",
+    "util": "^0.12.5"
+  }
+}

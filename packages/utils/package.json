@@ -1,0 +1,27 @@
+{
+  "name": "@webmunk/utils",
+  "version": "1.0.19",
+  "description": "scripts for create-webmunk-ext",
+  "main": "dist/main.js",
+  "scripts": {
+    "publish": "npm publish",
+    "build:dev": "BUILD_ENV=development webpack --config webpack.config.dev.js"
+  },
+  "files": [
+    "dist/"
+  ],
+  "keywords": [],
+  "author": "JM Lambert",
+  "license": "GPL V2",
+  "dependencies": {
+    "@webmunk/manifest-merge": "^5.10.0",
+    "child_process": "^1.0.2",
+    "fs-extra": "^11.1.1",
+    "lodash": "^4.17.21",
+    "os": "^0.1.2",
+    "path": "^0.12.7",
+    "react-dev-utils": "^12.0.1",
+    "util": "^0.12.5",
+    "uuid": "^10.0.0"
+  }
+}

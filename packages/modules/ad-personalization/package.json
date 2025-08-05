@@ -1,0 +1,23 @@
+{
+  "name": "@webmunk/ad-personalization",
+  "version": "1.0.0",
+  "description": "Module for setting up advertising personalization on websites",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build:dev": "MANIFEST_VERSION=3 BUILD_ENV=development webpack --config webpack.addon.config.dev.js"
+  },
+  "author": "Maks Zhaldak",
+  "license": "ISC",
+  "exports": {
+    "./worker": "./dist/worker",
+    "./content": "./dist/content"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.270",
+    "source-map-loader": "^5.0.0",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.6.2",
+    "webpack": "^5.94.0"
+  }
+}

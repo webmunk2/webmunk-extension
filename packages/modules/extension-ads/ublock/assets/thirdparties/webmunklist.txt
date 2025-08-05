@@ -1,0 +1,21 @@
+[Adblock Plus 2.0]
+! Title: webmunklist
+! Last modified: Fri, 05 Oct 2023 09:33:29 +0000
+! Expires: 6 days (update frequency)
+
+! *** webmunklist:template_header.txt ***
+!
+! Please report any unblocked adverts or problems
+! in the forums (https://forums.lanik.us/)
+! or via e-mail (easylist@protonmail.com).
+!
+!
+!-----------------------Specific advert blocking filters-----------------------!
+melty.fr##div[id^='internal_trc'] div[observeid]
+lemonde.fr##.OUTBRAIN .ob-dynamic-rec-link 
+facebook.com##svg:style(height: 15px; overflow: visible; width: 67.6094px;)>use[*|href^="#Svg"]
+facebook.com##svg:matches-css(height: 15px):matches-css(overflow: visible):matches-css(width: 67.6094px)>use[*|href^="#Svg"]
+facebook.com##svg:matches-css(height: 15px):matches-css(overflow: visible):matches-css(width: 65.4609px)>use[*|href^="#Svg"]
+!facebook.com##span:has-text(/Sponsored|Sponsoris/)
+!facebook.com##div:has-text(/Sponsored|Sponsoris/)
+developer.mozilla.org##.toc-container > .side.place > .pong-box

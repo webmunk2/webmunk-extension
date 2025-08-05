@@ -1,0 +1,18 @@
+[
+  {
+    "key": "gyta",
+    "name": "Google/YouTube",
+    "url": ["https://myadcenter.google.com/home"]
+  },
+  {
+    "key": "aap",
+    "name": "Amazon",
+    "url": ["https://www.amazon.com/adprefs"]
+  },
+  {
+    "key": "fad",
+    "name": "Facebook Activity Information/Instagram",
+    "url": ["https://accountscenter.facebook.com/ad_preferences/ad_settings/data_from_partners"]
+  }
+]
+

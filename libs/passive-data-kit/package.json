@@ -1,0 +1,11 @@
+{
+  "name": "@webmunk/passive-data-kit",
+  "version": "1.0.0",
+  "description": "analytics",
+  "main": "passive-data-kit.js",
+  "scripts": {
+    "dev": "echo \"Building pdk\""
+  },
+  "author": "Chris Karr",
+  "license": "ISC"
+}

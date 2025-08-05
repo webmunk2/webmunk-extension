@@ -1,0 +1,48 @@
+{
+  "name": "webmunk-ext",
+  "version": "1.0",
+  "private": true,
+  "dependencies": {
+    "@corex/deepmerge": "^2.6.148",
+    "@jitsu/js": "^1.9.17",
+    "@webmunk/ad-personalization": "file:../packages/modules/ad-personalization",
+    "@webmunk/cookies-scraper": "file:../packages/modules/cookies",
+    "@webmunk/extension-ads": "file:../packages/modules/extension-ads",
+    "@webmunk/utils": "file:../packages/utils",
+    "@webmunk/utils-scripts": "1.0.18",
+    "copy-webpack-plugin": "^11.0.0",
+    "dotenv-webpack": "^8.1.0",
+    "firebase": "^10.14.0",
+    "fs": "^0.0.1-security",
+    "git-revision-webpack-plugin": "^5.0.0",
+    "html-webpack-plugin": "^5.6.0",
+    "lodash": "^4.17.21",
+    "setimmediate": "^1.0.5",
+    "webpack": "^5.92.1",
+    "webpack-cli": "^5.1.4",
+    "webpack-extension-manifest-plugin": "^0.7.0",
+    "webpack-merge": "^5.10.0",
+    "webpack-preprocessor-loader": "^1.3.0",
+    "xhr-shim": "^0.1.3",
+    "zip-webpack-plugin": "^4.0.1"
+  },
+  "scripts": {
+    "addon:dev:hot": "MANIFEST_VERSION=3 BUILD_ENV=development webpack --config webpack.addon.config.dev.js",
+    "addon:build:prod": "MANIFEST_VERSION=3 BUILD_ENV=production webpack --config webpack.addon.chrome.config.prod.js",
+    "addon:build:prod-zip": "MANIFEST_VERSION=3 BUILD_ENV=production webpack --config webpack.addon.chrome.config.prod.zip.js",
+    "format": "prettier --write .",
+    "lint": "eslint 'src/**/*.js'",
+    "lint:fix": "eslint 'src/**/*.js' --fix"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.271",
+    "@types/setimmediate": "^1.0.4",
+    "eslint": "^9.9.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.2.1",
+    "prettier": "^3.3.3",
+    "source-map-loader": "^5.0.0",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.6.2"
+  }
+}

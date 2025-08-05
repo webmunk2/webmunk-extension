@@ -1,0 +1,7 @@
+{
+  "name": "Cookies Scraper",
+  "permissions": [{"name": "cookies", "justification": "to query and modify cookies"},
+                  {"name": "tabs", "justification": "to interact with the browser's tab system"}
+                ],
+  "host_permissions": []
+}

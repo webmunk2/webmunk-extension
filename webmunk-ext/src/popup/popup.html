@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Webmunk</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="wrapper">
+        <div class="main-container" id="getStartedContainer">
+            <div class="navbar">
+                <div style="display: flex; justify-content: flex-start; align-items: center;">
+                    <h1 class="title">Get Started</h1>
+                </div>
+            </div>
+
+            <div class="container">
+                <p>Please enter Prolific Id:</p>
+                <input class="logInInput" id="logInInput" type="text" placeholder="Prolific Id">
+                <div class="button-container">
+                    <button class="button" id="continueButton">Continue</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-container" id="studyExtensionContainer">
+            <div class="navbar">
+                <div style="display: flex; align-items: center;">
+                    <h1 class="title">Study Browser Extension</h1>
+                </div>
+            </div>
+
+            <div class="container">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div>
+                        <p style="font-weight: 500; line-height: 25px; font-size: 16px;">Identifier</p>
+                        <p id="formattedIdentifier" style="font-size: 18px;"></p>
+                    </div>
+                    <button class="button" id="copyButton">Copy</button>
+                </div>
+
+                <div style="display: flex; gap: 10px; flex-direction: column; margin-top: 10px;">
+                    <p id="tasks-status" style="font-weight: 500"></p>
+                    <ul id="task-list" class="list">
+                    </ul>
+                    <p style="font-size: 14px;">Tasks will be removed after completion (it may take a few hours to refresh)</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="notification" class="notification" style="display: none;">
+            <p id="notification-message" class="notification-message"></p>
+        </div>
+    </div>
+
+<script type="module" src="popup.js"></script>
+
+</body>
+</html>
