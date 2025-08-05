@@ -1,74 +1,59 @@
-# RudderStack & BigQuery & Firebase Integration Guide
+# Jitsu & BigQuery & Firebase Integration Guide
 
-This documentation outlines the setup and usage of **RudderStack**, **BigQuery** and **Firebase** in your project.
-
----
-
-## RudderStack Setup
-
-### 1. Create an Account
-
-1. Log in to **RudderStack Cloud** or create an account if you don’t have one.
-2. Once signed up, your email will be associated with a top-level **organization account**.
-
-**To view and manage organization settings:**
-- Navigate to `Settings > Organization` in your RudderStack dashboard.
+This documentation outlines the setup and usage of **Jitsu**, **BigQuery** and **Firebase** in your project.
 
 ---
 
-### 2. Set Up Source
+## Jitsu
 
-1. Go to **Sources** in your dashboard and click `Add Source`.
-2. Select a source type and assign it a name.
-3. Complete the setup by clicking `Continue`.
+### 1. Deploy Jitsu via Elestio
 
-**Once the source is set up, you’ll have access to:**
-- **Live Events**: View live events from the source.
-- **Setup Options**: Includes the installation snippet and the required write key for your source.
-
----
-
-### 3. Set Up Destination
-
-1. Go to **Destinations** and click `Add Destination`.
-2. Select a destination type, assign a name, and click `Continue`.
-3. Connect the destination to a source and configure the relevant connection settings.
-4. (Optional) Add transformations by clicking `Create New Transformation`.
-5. Finish the setup by clicking `Continue`.
-
-**After setup, you’ll see:**
-- **Live Events**: Monitor live event flows to the destination.
-- **Sources**: Displays connected sources and allows adding new ones.
-- **Metrics**: View delivery-related metrics, including delivered and failed events.
+1. Go to [https://elest.io](https://elest.io) and sign in or create an account.
+2. Create a new project.
+3. Select **Jitsu** as the service during project setup.
+4. Provide any necessary configuration parameters (e.g., project name, region, authentication).
+5. Once deployed, you’ll get access to the Jitsu web interface.
 
 ---
 
-### 3.1 Configuring the Destination for BigQuery
+### 2. Configure Destination (BigQuery)
 
-1. **Navigate to BigQuery Destination**: Select BigQuery as your destination type in the RudderStack dashboard.
-2. **Connect Source to BigQuery**:
-   - Choose the source that will send data to BigQuery.
-   - Configure the connection by providing necessary authentication details and project information.
-3. **Configuration fields**:
-   - Project (Project ID where your BigQuery database is located)
-   - Staging GCS Storage Bucket Name (Bucket to store data before loading into BigQuery)
-   - Namespace (Schema name for the warehouse where the tables are created)
-   - Credentials (GCP Service Account credentials JSON for RudderStack to use in loading data into your BigQuery database)
+1. Open the Jitsu dashboard from your Elestio deployment.
+2. Go to **Overview** and click **Add Destination**.
+3. Choose **BigQuery** as the destination type.
+4. Fill in the required fields:
+   - **Project ID** – your Google Cloud project ID
+   - **Dataset Name** – the BigQuery dataset where events will be stored
+   - **GCP Credentials** – upload or paste your Service Account JSON key
+5. Save the destination configuration.
 
 ---
 
-### 4. Install RudderStack Service
+### 3. Set Up Source (Website or App)
+
+1. In the Jitsu dashboard, go to **Overview** and click **Add Source**.
+2. Choose **JavaScript SDK (Browser)** or other appropriate type.
+3. Jitsu will generate a **Write Key** for this source.
+4. Copy the **Write Key** and **Ingest URL** – you’ll need them for SDK integration.
+
+---
+
+### 4. Integrate Jitsu in Your Codebase
 
 1. Install the package:
     ```bash
-    npm install @rudderstack/analytics-js-service-worker
+    npm install @jitsu/js
     ```
 
 2. Import and configure the service in your project:
     ```typescript
-    import { Analytics } from '@rudderstack/analytics-js-service-worker';
+    import { jitsuAnalytics } from "@jitsu/js";
+    import { JITSU_WRITE_KEY, JITSU_INGEST_URL } from "../config";
 
-    const client = new Analytics(RUDDERSTACK_WRITE_KEY, RUDDERSTACK_DATA_PLANE);
+    this.client = jitsuAnalytics({
+      writeKey: JITSU_WRITE_KEY,
+      host: JITSU_INGEST_URL,
+    });
     ```
 
 ---
@@ -80,7 +65,7 @@ Use the following example method to track events:
 ```typescript
 async track<T>(event: string, properties: T): Promise<void> {
   return new Promise((resolve, reject) => {
-    client.track(
+    this.client.track(
       { event, properties },
       (error, data) => (error ? reject(error) : resolve(data))
     );
