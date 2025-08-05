@@ -251,7 +251,7 @@ fetchSurveyConfig();
 
 ## Documentation
 
-[RudderStack API](https://www.rudderstack.com/docs/api/)
+[Jitsu API](https://classic.jitsu.com/docs)
 
 [BigQuery API](https://cloud.google.com/bigquery/docs/reference/rest)
 
