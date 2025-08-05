@@ -10,6 +10,7 @@ export const FIREBASE_CONFIG = {
   messagingSenderId: process.env?.FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env?.FIREBASE_APP_ID,
 };
+export const FIREBASE_BUCKET_URL = process.env?.FIREBASE_BUCKET_URL;
 // 1 week
 export const DELAY_BETWEEN_SURVEY = process.env?.DELAY_BETWEEN_SURVEY;
 // 2 weeks

@@ -238,11 +238,11 @@ export class SurveyService {
     return currentTime >= weekEndTime;
   }
 
-  public async isThisSurveyUrl(url: string): Promise<void> {
-    if (!this.surveys.some((survey) => survey.url === url)) return;
+  public async isThisSurveyUrl(url: URL): Promise<void> {
+    if (!this.surveys.some((survey) => survey.url === url.href)) return;
 
     await this.recordCookiesIfNeeded();
-    await this.eventService.track(events.SURVEY_STARTED, { surveyUrl: url });
+    await this.eventService.track(events.SURVEY_STARTED, { surveyUrl: url.href });
   }
 
   public async recordCookiesIfNeeded(): Promise<void> {
