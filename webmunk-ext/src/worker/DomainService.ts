@@ -9,6 +9,20 @@ export class DomainService {
     private readonly eventService: EventService
   ) {}
 
+  public async isNeedToExcludeSpecifiedDomain(url: URL): Promise<boolean> {
+    const domains = await this.getExcludedDomains();
+
+    const hostname = url.hostname;
+    const href = url.href;
+
+    const isExcluded = domains.some((domain) =>
+      hostname === domain ||
+      hostname.endsWith(`.${domain}`) ||
+      href.startsWith(domain));
+
+    return isExcluded;
+  }
+
   public async getExcludedDomains(): Promise<string[]> {
     const storageData = await chrome.storage.local.get('excludedDomains');
 

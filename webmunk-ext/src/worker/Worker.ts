@@ -9,6 +9,8 @@ import { FirebaseAppService } from './FirebaseAppService';
 import { ConfigService } from './ConfigService';
 import { DomainService } from './DomainService';
 import { SurveyService } from './SurveyService';
+import { ScreenshotService } from './ScreenshotService';
+import XMLHttpRequest from 'xhr-shim';
 import { NotificationText, UrlParameters, Event } from '../enums';
 import { getActiveTabId, getInstalledExtensions, isNeedToDisableSurveyLoading } from './utils';
 
@@ -22,6 +24,9 @@ if (typeof window === "undefined") {
   global.window = self;
 }
 
+// @ts-ignore
+(global as any)['XMLHttpRequest'] = XMLHttpRequest;
+
 export class Worker {
   private readonly firebaseAppService: FirebaseAppService;
   private readonly configService: ConfigService;
@@ -29,6 +34,7 @@ export class Worker {
   private readonly notificationService: NotificationService;
   private readonly surveyService: SurveyService;
   private readonly domainService: DomainService;
+  private readonly screenshotService: ScreenshotService;
   private isAdPersonalizationChecking: boolean = false;
 
   constructor() {
@@ -38,6 +44,7 @@ export class Worker {
     this.notificationService = new NotificationService();
     this.surveyService = new SurveyService(this.firebaseAppService, this.notificationService, this.eventService);
     this.domainService = new DomainService(this.configService, this.eventService);
+    this.screenshotService = new ScreenshotService(this.eventService, this.domainService, this.firebaseAppService);
   }
 
   public async initialize(): Promise<void> {
@@ -80,9 +87,7 @@ export class Worker {
   }
 
   private async middleware(): Promise<void> {
-    const user = await this.firebaseAppService.getUser();
-
-    if (!user || !user.active) return
+    if (!(await this.isUserExist())) return;
 
     await this.checkAdPersonalization();
     await this.domainService.trackExcludedDomains();
@@ -94,6 +99,8 @@ export class Worker {
       await this.login(request.prolificId);
     } else if (request.action === 'webmunkExt.popup.successRegister') {
       await this.handleSuccessfulRegistration();
+    } else if (request.action === 'page_action') {
+      await this.screenshotService.makeScreenshotIfNeeded(new URL(request.url));
     }
   }
 
@@ -216,39 +223,33 @@ export class Worker {
       return
     };
 
-    if (!tab || !tab.url || changeInfo.status !== 'complete') return;
+    if (!tab || !tab.url || changeInfo.status !== 'complete' || !(await this.isUserExist())) return;
+    const observedUrl = new URL(tab.url);
 
     await this.middleware();
-    await this.surveyService.isThisSurveyUrl(tab.url);
+    await this.surveyService.isThisSurveyUrl(observedUrl);
 
-    await this.trackUrlIfNeeded(tab.url);
+    await this.trackUrlIfNeeded(observedUrl);
+
+    await this.screenshotService.makeScreenshotIfNeeded(observedUrl);
   }
 
-  private async trackUrlIfNeeded(url: string): Promise<void> {
-    const domains = await this.domainService.getExcludedDomains();
-
-    const observedUrl = new URL(url)
-    const hostname = observedUrl.hostname;
-    const href = observedUrl.href;
+  private async trackUrlIfNeeded(url: URL): Promise<void> {
+    const isExcluded = await this.domainService.isNeedToExcludeSpecifiedDomain(url);
 
     /**
      * Check if the hostname is 'hbs.qualtrics.com'.
      * This is needed because we exclude 'qualtrics.com',
      * but the 'hbs' subdomain should be tracked.
     */
-    const isSpecialCase = hostname === 'hbs.qualtrics.com';
+    const isSpecialCase = url.hostname === 'hbs.qualtrics.com';
 
-    const isExcluded = !isSpecialCase && domains.some((domain) =>
-      hostname === domain ||
-      hostname.endsWith(`.${domain}`) ||
-      href.startsWith(domain));
-
-    if (isExcluded) {
-      await this.domainService.markExcludedDomainAsVisited(hostname);
+    if (isExcluded && !isSpecialCase) {
+      await this.domainService.markExcludedDomainAsVisited(url.hostname);
       return;
     }
 
-    await this.eventService.track(Event.URL_TRACKING, { url });
+    await this.eventService.track(Event.URL_TRACKING, { url: url.href });
   }
 
   private async trackInstalledExtensions(): Promise<void> {
@@ -261,5 +262,9 @@ export class Worker {
     const user = await this.firebaseAppService.getUser();
 
     await this.eventService.track(Event.USER_MAPPING, { prolificId: user.prolificId });
+  }
+
+  private async isUserExist(): Promise<boolean> {
+    return !!(await this.firebaseAppService.getUser());
   }
 }

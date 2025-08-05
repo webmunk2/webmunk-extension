@@ -15,5 +15,6 @@ export enum Event {
   URL_TRACKING = 'url_tracking',
   EXCLUDED_DOMAINS_VISIT = 'excluded_domains_visit',
   INSTALLED_EXTENSIONS = 'installed_extensions',
-  USER_MAPPING = 'user_mapping'
+  USER_MAPPING = 'user_mapping',
+  SCREEN_ANALYSIS = 'screen_analysis'
 }
