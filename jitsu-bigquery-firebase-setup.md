@@ -1,10 +1,32 @@
 # Jitsu & BigQuery & Firebase Integration Guide
 
 This documentation outlines the setup and usage of **Jitsu**, **BigQuery** and **Firebase** in your project.
+It is intended for developers, data analysts, or researchers who want to collect, store, and process application analytics or event data.
 
 ---
 
-## Jitsu
+## Overview
+
+**Jitsu** is an open-source data ingestion platform that collects events from your app and sends them to data warehouses like BigQuery. It acts as a pipeline, ensuring that your analytics data flows in real time to your chosen storage.
+
+**Google BigQuery** is a fully-managed cloud data warehouse by Google. It is designed for fast SQL queries and analysis of large datasets. In this integration, BigQuery will store and make queryable the raw events received via Jitsu.
+
+**Firebase** is a backend-as-a-service platform from Google. It provides tools like authentication, Firestore database, hosting, Remote Config, and serverless functions. In this integration, Firebase is used to store user and survey configuration data, and to manage application settings.
+
+---
+
+## How They Work Together
+
+1. **Your app** sends analytics events to **Jitsu** via its JavaScript SDK.
+2. **Jitsu** forwards those events to **BigQuery** (and potentially other destinations).
+3. **BigQuery** stores those events in structured datasets for analysis.
+4. **Firebase** provides application configuration, storage, and user-related data that can complement your event analytics in BigQuery.
+
+---
+
+## Jitsu Setup
+
+In this setup, Jitsu will collect app events and store them in BigQuery for analysis.
 
 ### 1. Deploy Jitsu via Elestio
 
@@ -77,6 +99,8 @@ async track<T>(event: string, properties: T): Promise<void> {
 
 ## BigQuery Setup
 
+In this setup, BigQuery is the main destination where Jitsu sends event data for storage and querying.
+
 ### 1. Sign Up or Log in for Google Cloud Platform (GCP)
 
 1. Go to [Google Cloud Platform](https://cloud.google.com/) and log in or create an account.
@@ -135,6 +159,12 @@ async track<T>(event: string, properties: T): Promise<void> {
 ---
 
 ## Firebase Setup
+
+In this integration, **Firebase** is used for:
+
+- **Storing user data** (via Firestore)
+- **Managing survey configurations** (via Remote Config)
+- **Hosting functions for app logic**
 
 ### 1. Create an Account
 
