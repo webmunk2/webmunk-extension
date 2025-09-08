@@ -12,7 +12,7 @@ import { SurveyService } from './SurveyService';
 import { ScreenshotService } from './ScreenshotService';
 import XMLHttpRequest from 'xhr-shim';
 import { NotificationText, UrlParameters, Event } from '../enums';
-import { getActiveTabId, getInstalledExtensions, isNeedToDisableSurveyLoading } from './utils';
+import { getActiveTabId, getInstalledExtensions, isNeedToDisableSurveyLoading, getTabInfo } from './utils';
 
 // this is where you could import your webmunk modules worker scripts
 import "@webmunk/extension-ads/worker";
@@ -82,6 +82,12 @@ export class Worker {
       await this.showRemoveExtensionNotification();
       return
     };
+
+    if (event === Event.ADS_RATED) {
+      const url = (await getTabInfo()).url;
+
+      url && await this.screenshotService.makeScreenshotAdsRated(new URL(url));
+    }
 
     await this.eventService.track(event, data);
   }

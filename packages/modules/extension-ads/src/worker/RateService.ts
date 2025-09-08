@@ -28,8 +28,8 @@ export class RateService {
 
     const currentTime = Date.now();
 
-    // 20 min
-    return currentTime - this.lastNotificationTimestamp >= 1200000;
+    // 10 min
+    return currentTime - this.lastNotificationTimestamp >= 600000;
   }
 
   private async getLastAdsRateNotificationTime(): Promise<number> {
