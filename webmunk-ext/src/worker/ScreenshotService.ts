@@ -59,8 +59,8 @@ export class ScreenshotService {
     const firebaseUrl = await this.firebaseAppService.uploadScreenshotToFirebase(blob, Event.SCREEN_ANALYSIS);
     if (!firebaseUrl) return;
 
-      const timestamp = new Date().toISOString();
-      const response = await this.analyzeScreenshot(firebaseUrl);
+    const timestamp = new Date().toISOString();
+    const response = await this.analyzeScreenshot(firebaseUrl);
 
     this.lastScreenshot = Date.now();
 
