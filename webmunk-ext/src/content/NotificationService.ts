@@ -10,6 +10,8 @@ export class NotificationService {
       await chrome.runtime.sendMessage({ action: 'webmunkExt.popup.checkSettingsReq', data: message.data })
     } else if (message.action === 'webmunkExt.worker.notifyCookiesModule') {
       await chrome.runtime.sendMessage({ action: 'webmunkExt.worker.recordCookies' });
+    } else if (message.action === 'webmunkExt.screenshotService.isThereNotificationReq') {
+      this.checkIfWebmunkNotificationExists();
     }
   }
 
@@ -22,6 +24,7 @@ export class NotificationService {
   }
 
   private displayNotification(text: string): void {
+    if (document.getElementById('webmunk-rate-notification')) return;
     if (document.getElementById('webmunk-notification')) return;
     this.sendResponseToService();
 
@@ -135,5 +138,13 @@ export class NotificationService {
     chrome.runtime.sendMessage({
       action: 'webmunkExt.notificationService.extensionNotificationResponse',
     });
+  }
+
+  private checkIfWebmunkNotificationExists(): void {
+    const notifications = Array.from(document.querySelectorAll('[id="webmunk-notification"], [id="webmunk-rate-notification"]'));
+
+    const isExist = !!notifications.length;
+
+    chrome.runtime.sendMessage({ action: 'webmunkExt.notificationService.isThereNotificationRes', result: isExist });
   }
 }

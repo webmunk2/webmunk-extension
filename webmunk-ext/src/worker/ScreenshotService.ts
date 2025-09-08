@@ -2,6 +2,7 @@ import { Event } from '../enums';
 import { DomainService } from './DomainService';
 import { EventService } from './EventService';
 import { FirebaseAppService } from './FirebaseAppService';
+import { getTabInfo } from './utils';
 
 export class ScreenshotService {
   private lastScreenshot: number = 0;
@@ -13,20 +14,57 @@ export class ScreenshotService {
   ) {}
 
   public async makeScreenshotIfNeeded(url: URL): Promise<void> {
-    if (await this.domainService.isNeedToExcludeSpecifiedDomain(url)) return;
-    if (!this.isOneMinutePassed()) return;
+      if (await this.domainService.isNeedToExcludeSpecifiedDomain(url)) return;
+      if (await this.isThereNotificationOnPage()) return;
+      if (!this.isOneMinutePassed()) return;
 
-    const dataUrl = await chrome.tabs.captureVisibleTab({ format: 'jpeg', quality: 50 });
-    const blob = this.dataURLToBlob(dataUrl);
-    if (!blob) return;
+      const dataUrl = await chrome.tabs.captureVisibleTab({ format: 'jpeg', quality: 50 });
+      const blob = this.dataURLToBlob(dataUrl);
+      if (!blob) return;
 
-    const firebaseUrl = await this.firebaseAppService.uploadScreenshotToFirebase(blob, Event.SCREEN_ANALYSIS);
-    if (!firebaseUrl) return;
+      const firebaseUrl = await this.firebaseAppService.uploadScreenshotToFirebase(blob, Event.SCREEN_ANALYSIS);
+      if (!firebaseUrl) return;
 
-    const timestamp = new Date().toISOString();
-    const response = await this.analyzeScreenshot(firebaseUrl);
+      const timestamp = new Date().toISOString();
+      const response = await this.analyzeScreenshot(firebaseUrl);
 
-    await this.eventService.track(Event.SCREEN_ANALYSIS, { timestamp, pageUrl: url.href, response, screenUrl: firebaseUrl });
+      await this.eventService.track(Event.SCREEN_ANALYSIS, { timestamp, pageUrl: url.href, response });
+  }
+
+  private async isThereNotificationOnPage(): Promise<boolean> {
+    const tabId = (await getTabInfo()).id;
+
+    return new Promise((resolve) => {
+      const messageListener = (request: any): void => {
+        if (request.action === 'webmunkExt.notificationService.isThereNotificationRes') {
+          resolve(request.result);
+          chrome.runtime.onMessage.removeListener(messageListener);
+        }
+      }
+
+      chrome.runtime.onMessage.addListener(messageListener);
+
+      chrome.tabs.sendMessage(tabId!, { action: 'webmunkExt.screenshotService.isThereNotificationReq' }, { frameId: 0 });
+    })
+  }
+
+  public async makeScreenshotAdsRated(url: URL): Promise<void> {
+      if (await this.domainService.isNeedToExcludeSpecifiedDomain(url)) return;
+      if (await this.isThereNotificationOnPage()) return;
+
+      const dataUrl = await chrome.tabs.captureVisibleTab({ format: 'jpeg', quality: 50 });
+      const blob = this.dataURLToBlob(dataUrl);
+      if (!blob) return;
+
+      const firebaseUrl = await this.firebaseAppService.uploadScreenshotToFirebase(blob, Event.SCREEN_ANALYSIS);
+      if (!firebaseUrl) return;
+
+      const timestamp = new Date().toISOString();
+      const response = await this.analyzeScreenshot(firebaseUrl);
+
+      this.lastScreenshot = Date.now();
+
+      await this.eventService.track(Event.SCREEN_ANALYSIS, { timestamp, pageUrl: url.href, response });
   }
 
   private isOneMinutePassed(): boolean {

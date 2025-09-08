@@ -20,6 +20,8 @@ export class RateService {
   private showAdRatingNotification(): void {
     if (document.getElementById('webmunk-rate-notification')) return;
 
+    this.removeSurveyNotificationIfExist();
+
     const styles = document.createElement('style');
     styles.textContent = `
       @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap');
@@ -69,7 +71,7 @@ export class RateService {
           opacity: 0;
         }
         100% {
-          opacity: 1;
+          opacity: 0.8;
         }
       }
 
@@ -117,10 +119,10 @@ export class RateService {
       .close-button {
         background-color: transparent;
         cursor: pointer;
-        fill: rgb(175, 175, 175);
+        fill: black;
 
         &:hover {
-          fill: black;
+          fill: rgb(175, 175, 175);
         }
       }
 
@@ -188,8 +190,10 @@ export class RateService {
           <button class="response-btn" data-question="distraction">No</button>
         </div>
       </div>
+      <div style="display: flex; justify-content: center; align-items: center; margin-top: 20px">
+        <button class="response-btn" style="width: 160px" data-absent>I don't see any ads</button>
+      </div>
     `;
-
     notificationContainer.innerHTML = notificationContent;
     wrapper.appendChild(notificationContainer);
     document.documentElement.appendChild(wrapper);
@@ -202,6 +206,13 @@ export class RateService {
     document.querySelectorAll('.response-btn').forEach((button) => {
       button.addEventListener('click', (event) => {
         const target = event.target as HTMLElement;
+
+        if (target.hasAttribute('data-absent')) {
+          wrapper.remove();
+          this.sendResponseToService('noAdsSeen');
+          return;
+         }
+
         const question = target.dataset.question;
         const answer = target.textContent;
 
@@ -214,8 +225,8 @@ export class RateService {
         target.classList.add('active');
 
         if (this.responses?.relevance && this.responses?.distraction) {
-          this.sendResponseToService(this.responses);
           wrapper.remove();
+          this.sendResponseToService(this.responses);
         }
       });
     });
@@ -226,5 +237,11 @@ export class RateService {
       action: 'extensionAds.rateService.adRatingResponse',
       response
     });
+  }
+
+  private removeSurveyNotificationIfExist(): void {
+    const surveyNotification = document.getElementById('webmunk-notification');
+
+    surveyNotification && surveyNotification.remove();
   }
 }
