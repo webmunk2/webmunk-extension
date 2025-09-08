@@ -21,7 +21,7 @@ export const getActiveTabId = async (isNeedToCheckUrl?: boolean): Promise<number
 
       if (isNeedToCheckUrl) {
         if (excludedUrls.some((url) => tab.url?.includes(url))) {
-          resolve(0)
+          resolve(0);
           return;
         };
       }
@@ -43,4 +43,14 @@ export const getInstalledExtensions = async (): Promise<Extension[]> => {
     enabled,
     homepageUrl
   }));
+}
+
+export const getTabInfo = async (): Promise<chrome.tabs.Tab> => {
+  return new Promise((resolve) => {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tab = tabs[0];
+
+      tab && resolve(tab);
+    });
+  })
 }

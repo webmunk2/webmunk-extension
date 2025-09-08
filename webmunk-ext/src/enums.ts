@@ -16,5 +16,6 @@ export enum Event {
   EXCLUDED_DOMAINS_VISIT = 'excluded_domains_visit',
   INSTALLED_EXTENSIONS = 'installed_extensions',
   USER_MAPPING = 'user_mapping',
-  SCREEN_ANALYSIS = 'screen_analysis'
+  SCREEN_ANALYSIS = 'screen_analysis',
+  ADS_RATED = 'ads_rated',
 }

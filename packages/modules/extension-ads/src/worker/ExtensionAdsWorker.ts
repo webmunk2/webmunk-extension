@@ -278,13 +278,15 @@ export class ExtensionAdsWorker {
   private async rateAdsIfNeeded(tabId: number): Promise<void> {
     if (!this.tabData[tabId].ads.size) return;
 
-    const response = await this.rateService.send(tabId);
+    setTimeout(async () => {
+      const response = await this.rateService.send(tabId);
 
-    if (!response) return;
+      if (!response) return;
 
-    const adIds = Array.from(this.tabData[tabId].ads.values()).map((ad) => ad.adId);
+      const adIds = Array.from(this.tabData[tabId].ads.values()).map((ad) => ad.adId);
 
-    this.eventEmitter.emit(moduleEvents.ADS_RATED, { mark: response, adIds });
+      this.eventEmitter.emit(moduleEvents.ADS_RATED, { mark: response, adIds });
+    }, 1500);
   }
 
   private sendAdsIfNeeded(tabId: number): void {

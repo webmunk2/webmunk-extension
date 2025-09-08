@@ -35,29 +35,19 @@ export const analyzeScreenshot = onRequest(async (req, res) => {
             content: [
               {
                 type: 'text',
-                text:
-`You are given a screenshot of a website. Your task is to identify and count every advertisement on the page.
-Then list each ad with a short description.
-
-Definition: An advertisement is any sponsored, promotional, or paid element intended to sell a product or service.
-
-Indicators of ads are labels like 'Sponsored' or 'Ad'
-
+                text: `You are given a screenshot of a website. Your task is to identify, count, and summarize every advertisement on the page.
+Definition: An advertisement is any sponsored, promotional, or paid element intended to sell a product or service. Indicators of ads are labels like 'Sponsored' or 'Ad'.
 Ad grouping rules:
-- If each product has its own distinct ad label, count each one as a separate ad unit.
-- If multiple products appear together in one section or carousel that has a single 'Sponsored' or ad label nearby, count it as one ad unit.
-- If a label is positioned above or beside a group when individual products are not labeled, assume it applies to the whole group.
-
-Return your output in exactly this format, as one line with no line breaks or extra text:
-
-[TOTAL]+---+[AD1]+---+[AD2]+---+...+[ADN]
-
-- Replace [TOTAL] with the number of ads you found.
-- Replace [AD1], [AD2], etc. with ad descriptions.
-- Use +---+ exactly as the separator between all parts.
-- If there are no ads, return exactly: 0
-
-Do not include any explanations, quotes, or new lines — return the formatted output only.`
+ - If each product has its own distinct ad label, count each one as a separate ad unit.
+ - If multiple products appear together in one section or carousel that has a single 'Sponsored' or ad label nearby, count it as one ad unit.
+ - If a label is positioned above or beside a group when individual products are not labeled, assume it applies to the whole group.
+For each ad, please identify the brand associated with the ad and summarize the information content of the ad. If it contains a price, please also determine its price.
+Return your output in exactly this format, as one line with no line breaks or extra text: [TOTAL]+---+[AD1]+---+[AD2]+---+...+[ADN]
+ - Replace [TOTAL] with the number of ads you found.
+ - Replace [AD1], [AD2], etc. with each ad identified. For [AD1], please format the output as brand || description of the content || price
+ - Use +---+ exactly as the separator between all parts.
+ - If there are no ads, return exactly: 0
+ - Do not include any explanations, quotes, or new lines — return the formatted output only.`,
               },
               {
                 type: 'image_url',
