@@ -1,4 +1,4 @@
-import { Event } from '../enums';
+import { Event, ExcludedDomains } from '../enums';
 import { DomainService } from './DomainService';
 import { EventService } from './EventService';
 import { FirebaseAppService } from './FirebaseAppService';
@@ -14,7 +14,7 @@ export class ScreenshotService {
   ) {}
 
   public async makeScreenshotIfNeeded(url: URL): Promise<void> {
-    if (await this.domainService.isNeedToExcludeSpecifiedDomain(url)) return;
+    if (await this.domainService.isNeedToExcludeSpecifiedDomain(url, ExcludedDomains.screenshots)) return;
     if (await this.isThereNotificationOnPage()) return;
     if (!this.isOneMinutePassed()) return;
 
@@ -49,7 +49,7 @@ export class ScreenshotService {
   }
 
   public async makeScreenshotAdsRated(url: URL): Promise<void> {
-    if (await this.domainService.isNeedToExcludeSpecifiedDomain(url)) return;
+    if (await this.domainService.isNeedToExcludeSpecifiedDomain(url, ExcludedDomains.screenshots)) return;
     if (await this.isThereNotificationOnPage()) return;
 
     const dataUrl = await chrome.tabs.captureVisibleTab({ format: 'jpeg', quality: 50 });

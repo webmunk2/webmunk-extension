@@ -1,6 +1,7 @@
 export type FirebaseConfig = {
   surveys: JSON,
-  excludedDomains: JSON,
+  excludedUrlTrackingDomains: JSON,
+  excludedScreenshotsDomains: JSON,
   trackInactiveUsers: boolean,
 }
 

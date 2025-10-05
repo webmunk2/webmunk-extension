@@ -1,6 +1,7 @@
 import { ConfigService } from './ConfigService';
 import { EventService } from './EventService';
-import { Event } from '../enums';
+import { Event, ExcludedDomains } from '../enums';
+import { type FirebaseConfig } from './FirebaseRemoteConfig';
 import { DELAY_BETWEEN_EXCLUDED_VISITED_DOMAINS } from '../config';
 
 export class DomainService {
@@ -9,8 +10,8 @@ export class DomainService {
     private readonly eventService: EventService
   ) {}
 
-  public async isNeedToExcludeSpecifiedDomain(url: URL): Promise<boolean> {
-    const domains = await this.getExcludedDomains();
+  public async isNeedToExcludeSpecifiedDomain(url: URL, config: keyof FirebaseConfig): Promise<boolean> {
+    const domains = await this.getExcludedDomains(config);
 
     const hostname = url.hostname;
     const href = url.href;
@@ -23,10 +24,10 @@ export class DomainService {
     return isExcluded;
   }
 
-  public async getExcludedDomains(): Promise<string[]> {
-    const storageData = await chrome.storage.local.get('excludedDomains');
+  public async getExcludedDomains(config: keyof FirebaseConfig): Promise<string[]> {
+    const storageData = await chrome.storage.local.get(config);
 
-    return storageData.excludedDomains || [];
+    return storageData[config] || [];
   }
 
   public async markExcludedDomainAsVisited(domain: string): Promise<void> {
@@ -37,12 +38,12 @@ export class DomainService {
     await chrome.storage.local.set({ excludedDomainVisits: visits });
   }
 
-  public async initExcludedDomains(): Promise<void> {
-    const excludedDomainsString = await this.configService.getConfigByKey('excludedDomains');
+  public async initExcludedDomains(config: keyof FirebaseConfig): Promise<void> {
+    const excludedDomainsString = await this.configService.getConfigByKey(config);
     const newDomains: string[] = excludedDomainsString ? JSON.parse(excludedDomainsString) : [];
 
-    await this.startDayTiming();
-    await this.saveExcludedDomainsIfNeeded(newDomains);
+    if (config === ExcludedDomains.url_tracking) await this.startDayTiming();
+    await this.saveExcludedDomainsIfNeeded(newDomains, config);
   }
 
   public async trackExcludedDomains(): Promise<void> {
@@ -53,16 +54,17 @@ export class DomainService {
     if (!(await this.isDayPassed())) return;
 
     await this.clearVisitedDomains();
-    await this.initExcludedDomains();
+    await this.initExcludedDomains(ExcludedDomains.url_tracking);
+    await this.initExcludedDomains(ExcludedDomains.screenshots);
     await this.eventService.track(Event.EXCLUDED_DOMAINS_VISIT, { visits });
   }
 
-  private async saveExcludedDomainsIfNeeded(newDomains: string[]): Promise<void> {
-    const storageData = await chrome.storage.local.get('excludedDomains');
-    const savedDomains: string[] = storageData.excludedDomains || [];
+  private async saveExcludedDomainsIfNeeded(newDomains: string[], config: keyof FirebaseConfig): Promise<void> {
+    const storageData = await chrome.storage.local.get(config);
+    const savedDomains: string[] = storageData[config] || [];
 
     if (!savedDomains.length || this.isUpdateNeeded(savedDomains, newDomains)) {
-      await chrome.storage.local.set({ excludedDomains: newDomains });
+      await chrome.storage.local.set({ [config]: newDomains });
     }
   }
 
