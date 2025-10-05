@@ -11,7 +11,7 @@ import { DomainService } from './DomainService';
 import { SurveyService } from './SurveyService';
 import { ScreenshotService } from './ScreenshotService';
 import XMLHttpRequest from 'xhr-shim';
-import { NotificationText, UrlParameters, Event } from '../enums';
+import { NotificationText, UrlParameters, Event, ExcludedDomains } from '../enums';
 import { getActiveTabId, getInstalledExtensions, isNeedToDisableSurveyLoading, getTabInfo } from './utils';
 
 // this is where you could import your webmunk modules worker scripts
@@ -50,7 +50,8 @@ export class Worker {
   public async initialize(): Promise<void> {
     await this.firebaseAppService.login();
     await this.surveyService.initSurveysIfExists();
-    await this.domainService.initExcludedDomains();
+    await this.domainService.initExcludedDomains(ExcludedDomains.url_tracking);
+    await this.domainService.initExcludedDomains(ExcludedDomains.screenshots);
 
     messenger.addReceiver('appMgr', this);
     messenger.addModuleListener('ads-scraper', this.onModuleEvent.bind(this));
@@ -241,7 +242,7 @@ export class Worker {
   }
 
   private async trackUrlIfNeeded(url: URL): Promise<void> {
-    const isExcluded = await this.domainService.isNeedToExcludeSpecifiedDomain(url);
+    const isExcluded = await this.domainService.isNeedToExcludeSpecifiedDomain(url, ExcludedDomains.url_tracking);
 
     /**
      * Check if the hostname is 'hbs.qualtrics.com'.
