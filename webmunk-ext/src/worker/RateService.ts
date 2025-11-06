@@ -1,7 +1,12 @@
+import { Event } from '../enums';
+import { EventService } from './EventService';
+import { DELAY_BETWEEN_AD_RATING_POPUP } from '../config';
+import { RateResponses } from '../types';
+
 export class RateService {
   private lastNotificationTimestamp: number;
 
-  constructor() {
+  constructor(private readonly eventService: EventService) {
     this.lastNotificationTimestamp = 0;
     this.initializeLastNotificationTime();
   }
@@ -29,7 +34,7 @@ export class RateService {
     const currentTime = Date.now();
 
     // 10 min
-    return currentTime - this.lastNotificationTimestamp >= 600000;
+    return currentTime - this.lastNotificationTimestamp >= Number(DELAY_BETWEEN_AD_RATING_POPUP);
   }
 
   private async getLastAdsRateNotificationTime(): Promise<number> {
@@ -37,18 +42,25 @@ export class RateService {
     return result.lastAdsRateNotificationTime || 0;
   }
 
-  public async send(tabId: number): Promise<any> {
+  private async trackAdsRated(response: RateResponses | string, screenshotTimestamp: string): Promise<void> {
+    await this.eventService.track(Event.ADS_RATED, { mark: response, screenshotTimestamp });
+  }
+
+  public async send(tabId: number, screenshotTimestamp: string): Promise<any> {
     if (!await this.shouldNotify()) return;
 
     this.lastNotificationTimestamp = Date.now();
     chrome.storage.local.set({ lastAdsRateNotificationTime: this.lastNotificationTimestamp });
-    return new Promise((resolve, reject) => {
-      const messageListener = (message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
-        if (message.action === 'extensionAds.rateService.adRatingResponse') {
+    return new Promise<void>((resolve, reject) => {
+      const messageAction = `webmunkExt.rateService.adRatingResponse_${screenshotTimestamp}`;
+      const messageListener = async (message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
+        if (message.action === messageAction) {
           chrome.runtime.onMessage.removeListener(messageListener);
           chrome.tabs.onRemoved.removeListener(tabCloseListener);
 
-          resolve(message.response);
+          await this.trackAdsRated(message.response, screenshotTimestamp);
+
+          resolve();
         }
       };
 
@@ -64,7 +76,7 @@ export class RateService {
 
       chrome.tabs.sendMessage(
         tabId,
-        { action: 'extensionAds.rateService.adRatingRequest' },
+        { action: 'webmunkExt.rateService.adRatingRequest', timestamp: screenshotTimestamp },
         { frameId: 0 }
       );
     });

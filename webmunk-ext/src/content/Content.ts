@@ -1,12 +1,15 @@
 import { NotificationService } from './NotificationService';
+import { RateService } from './RateService';
 
 export class Content {
   private lastScrollSent = 0;
   private readonly SCROLL_THROTTLE_MS = 1000;
-  private readonly notificationService: NotificationService
+  private readonly notificationService: NotificationService;
+  private readonly rateService: RateService;
 
   constructor () {
     this.notificationService = new NotificationService();
+    this.rateService = new RateService();
   }
 
   public initialize(): void {

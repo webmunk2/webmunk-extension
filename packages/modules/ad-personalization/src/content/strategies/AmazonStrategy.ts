@@ -9,13 +9,12 @@ export class AmazonStrategy extends BaseStrategy {
     const { value } = data;
     let currentValue = value ?? false;
 
-    const signInButton = document.querySelector('#a-autoid-0-announce') as HTMLElement;
+    const signInButton = document.querySelector('#adprefs-signin-button-id') as HTMLElement;
+    const signInAnchorElement = signInButton.querySelector('a');
 
-    if (signInButton) {
-      const initialUrl = window.location.href;
-
-      signInButton.click();
-      await this.observeUrlChanging(initialUrl);
+    if (signInAnchorElement) {
+      signInAnchorElement.click();
+      await this.observeUrlChanging(signInAnchorElement.href);
     }
 
     const boxes = await this.waitForElements<HTMLInputElement>('[name="optout"]', true);

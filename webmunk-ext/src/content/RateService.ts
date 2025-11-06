@@ -1,7 +1,4 @@
-type RateResponses = {
-  relevance: string | null;
-  distraction: string | null;
-}
+import { RateResponses } from '../types';
 
 export class RateService {
   private responses: RateResponses;
@@ -12,12 +9,12 @@ export class RateService {
   }
 
   private handleMessage(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void): void {
-    if (message.action === 'extensionAds.rateService.adRatingRequest') {
-      this.showAdRatingNotification();
+    if (message.action === 'webmunkExt.rateService.adRatingRequest') {
+      this.showAdRatingNotification(message.timestamp);
     }
   }
 
-  private showAdRatingNotification(): void {
+  private showAdRatingNotification(timestamp: string): void {
     if (document.getElementById('webmunk-rate-notification')) return;
 
     this.removeSurveyNotificationIfExist();
@@ -199,7 +196,7 @@ export class RateService {
     document.documentElement.appendChild(wrapper);
 
     document.getElementById('rate-close-button')!.addEventListener('click', () => {
-      this.sendResponseToService('skip');
+      this.sendResponseToService('skip', timestamp);
       wrapper.remove();
     });
 
@@ -209,7 +206,7 @@ export class RateService {
 
         if (target.hasAttribute('data-absent')) {
           wrapper.remove();
-          this.sendResponseToService('noAdsSeen');
+          this.sendResponseToService('noAdsSeen', timestamp);
           return;
          }
 
@@ -226,15 +223,15 @@ export class RateService {
 
         if (this.responses?.relevance && this.responses?.distraction) {
           wrapper.remove();
-          this.sendResponseToService(this.responses);
+          this.sendResponseToService(this.responses, timestamp);
         }
       });
     });
   }
 
-  private sendResponseToService(response: RateResponses | string): void {
+  private sendResponseToService(response: RateResponses | string, timestamp: string): void {
     chrome.runtime.sendMessage({
-      action: 'extensionAds.rateService.adRatingResponse',
+      action: `webmunkExt.rateService.adRatingResponse_${timestamp}`,
       response
     });
   }

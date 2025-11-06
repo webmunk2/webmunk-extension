@@ -13,6 +13,7 @@ import { ScreenshotService } from './ScreenshotService';
 import XMLHttpRequest from 'xhr-shim';
 import { NotificationText, UrlParameters, Event, ExcludedDomains } from '../enums';
 import { getActiveTabId, getInstalledExtensions, isNeedToDisableSurveyLoading, getTabInfo } from './utils';
+import { RateService } from './RateService';
 
 // this is where you could import your webmunk modules worker scripts
 import "@webmunk/extension-ads/worker";
@@ -35,6 +36,7 @@ export class Worker {
   private readonly surveyService: SurveyService;
   private readonly domainService: DomainService;
   private readonly screenshotService: ScreenshotService;
+  private readonly rateService: RateService;
   private isAdPersonalizationChecking: boolean = false;
 
   constructor() {
@@ -44,7 +46,8 @@ export class Worker {
     this.notificationService = new NotificationService();
     this.surveyService = new SurveyService(this.firebaseAppService, this.notificationService, this.eventService);
     this.domainService = new DomainService(this.configService, this.eventService);
-    this.screenshotService = new ScreenshotService(this.eventService, this.domainService, this.firebaseAppService);
+    this.rateService = new RateService(this.eventService);
+    this.screenshotService = new ScreenshotService(this.eventService, this.domainService, this.firebaseAppService, this.configService, this.rateService);
   }
 
   public async initialize(): Promise<void> {
@@ -83,12 +86,6 @@ export class Worker {
       await this.showRemoveExtensionNotification();
       return
     };
-
-    if (event === Event.ADS_RATED) {
-      const url = (await getTabInfo()).url;
-
-      url && await this.screenshotService.makeScreenshotAdsRated(new URL(url));
-    }
 
     await this.eventService.track(event, data);
   }

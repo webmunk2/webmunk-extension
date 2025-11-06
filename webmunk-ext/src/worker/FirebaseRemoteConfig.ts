@@ -2,7 +2,8 @@ export type FirebaseConfig = {
   surveys: JSON,
   excludedUrlTrackingDomains: JSON,
   excludedScreenshotsDomains: JSON,
-  trackInactiveUsers: boolean,
+  stopDataCollectionForSpecifiedUsers: JSON,
+  stopDataCollection: boolean
 }
 
 const FirebaseConfigTypes = {};
