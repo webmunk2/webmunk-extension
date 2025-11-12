@@ -1,276 +1,280 @@
-// dont remove next line, all webmunk modules use messenger utility
-// @ts-ignore
-import { messenger } from '@webmunk/utils';
-import { NotificationService } from './NotificationService';
-import { AdPersonalizationItem, PersonalizationConfigItem } from '../types';
-import { DELAY_BETWEEN_REMOVE_NOTIFICATION, DELAY_BETWEEN_AD_PERSONALIZATION, UNINSTALL_URL } from '../config';
-import { EventService } from './EventService';
-import { FirebaseAppService } from './FirebaseAppService';
-import { ConfigService } from './ConfigService';
-import { DomainService } from './DomainService';
-import { SurveyService } from './SurveyService';
-import { ScreenshotService } from './ScreenshotService';
-import XMLHttpRequest from 'xhr-shim';
-import { NotificationText, UrlParameters, Event } from '../enums';
-import { getActiveTabId, getInstalledExtensions, isNeedToDisableSurveyLoading, getTabInfo } from './utils';
+// // dont remove next line, all webmunk modules use messenger utility
+// // @ts-ignore
+// import { messenger } from '@webmunk/utils';
+// import { NotificationService } from './NotificationService';
+// import { AdPersonalizationItem, PersonalizationConfigItem } from '../types';
+// import { DELAY_BETWEEN_REMOVE_NOTIFICATION, DELAY_BETWEEN_AD_PERSONALIZATION, UNINSTALL_URL } from '../config';
+// import { EventService } from './EventService';
+// import { FirebaseAppService } from './FirebaseAppService';
+// import { ConfigService } from './ConfigService';
+// import { DomainService } from './DomainService';
+// import { SurveyService } from './SurveyService';
+// import { ScreenshotService } from './ScreenshotService';
+// import XMLHttpRequest from 'xhr-shim';
+// import { NotificationText, UrlParameters, Event } from '../enums';
+// import { getActiveTabId, getInstalledExtensions, isNeedToDisableSurveyLoading, getTabInfo } from './utils';
 
-// this is where you could import your webmunk modules worker scripts
-import "@webmunk/extension-ads/worker";
-import "@webmunk/cookies-scraper/worker";
-import "@webmunk/ad-personalization/worker";
+// // this is where you could import your webmunk modules worker scripts
+// // import "@webmunk/extension-ads/worker";
+// // import "@webmunk/cookies-scraper/worker";
+// // import "@webmunk/ad-personalization/worker";
+// console.log('[wm] worker loaded');
 
-if (typeof window === "undefined") {
-  // @ts-ignore
-  global.window = self;
-}
 
-// @ts-ignore
-(global as any)['XMLHttpRequest'] = XMLHttpRequest;
+// if (typeof window === "undefined") {
+//   // @ts-ignore
+//   global.window = self;
+// }
 
-export class Worker {
-  private readonly firebaseAppService: FirebaseAppService;
-  private readonly configService: ConfigService;
-  private readonly eventService: EventService;
-  private readonly notificationService: NotificationService;
-  private readonly surveyService: SurveyService;
-  private readonly domainService: DomainService;
-  private readonly screenshotService: ScreenshotService;
-  private isAdPersonalizationChecking: boolean = false;
+// // @ts-ignore
+// (global as any)['XMLHttpRequest'] = XMLHttpRequest;
 
-  constructor() {
-    this.firebaseAppService = new FirebaseAppService();
-    this.configService = new ConfigService(this.firebaseAppService);
-    this.eventService = new EventService(this.firebaseAppService, this.configService);
-    this.notificationService = new NotificationService();
-    this.surveyService = new SurveyService(this.firebaseAppService, this.notificationService, this.eventService);
-    this.domainService = new DomainService(this.configService, this.eventService);
-    this.screenshotService = new ScreenshotService(this.eventService, this.domainService, this.firebaseAppService);
-  }
+// export class Worker {
+//   private readonly firebaseAppService: FirebaseAppService;
+//   private readonly configService: ConfigService;
+//   private readonly eventService: EventService;
+//   private readonly notificationService: NotificationService;
+//   private readonly surveyService: SurveyService;
+//   private readonly domainService: DomainService;
+//   private readonly screenshotService: ScreenshotService;
+//   private isAdPersonalizationChecking: boolean = false;
 
-  public async initialize(): Promise<void> {
-    await this.firebaseAppService.login();
-    await this.surveyService.initSurveysIfExists();
-    await this.domainService.initExcludedDomains();
+//   constructor() {
+//     this.firebaseAppService = new FirebaseAppService();
+//     this.configService = new ConfigService(this.firebaseAppService);
+//     this.eventService = new EventService(this.firebaseAppService, this.configService);
+//     this.notificationService = new NotificationService();
+//     this.surveyService = new SurveyService(this.firebaseAppService, this.notificationService, this.eventService);
+//     this.domainService = new DomainService(this.configService, this.eventService);
+//     this.screenshotService = new ScreenshotService(this.eventService, this.domainService, this.firebaseAppService);
+//   }
 
-    messenger.addReceiver('appMgr', this);
-    messenger.addModuleListener('ads-scraper', this.onModuleEvent.bind(this));
-    messenger.addModuleListener('cookies-scraper', this.onModuleEvent.bind(this));
-    messenger.addModuleListener('ad-personalization', this.onAdPersonalizationModuleEvent.bind(this));
-    chrome.runtime.onMessage.addListener(this.onPopupMessage.bind(this),);
-    chrome.tabs.onUpdated.addListener(this.onUrlTracking.bind(this));
-  }
+//   public async initialize(): Promise<void> {
+//     await this.firebaseAppService.login();
+//     await this.surveyService.initSurveysIfExists();
+//     await this.domainService.initExcludedDomains();
 
-  private onAdPersonalizationModuleEvent(event: string, data: any): void {
-    this.eventService.track(event, data);
-  }
+//     messenger.addReceiver('appMgr', this);
+//     messenger.addModuleListener('ads-scraper', this.onModuleEvent.bind(this));
+//     messenger.addModuleListener('cookies-scraper', this.onModuleEvent.bind(this));
+//     messenger.addModuleListener('ad-personalization', this.onAdPersonalizationModuleEvent.bind(this));
+//     chrome.runtime.onMessage.addListener(this.onPopupMessage.bind(this),);
+//     chrome.tabs.onUpdated.addListener(this.onUrlTracking.bind(this));
+//   }
 
-  private async login(prolificId: string): Promise<void> {
-    const response: any = { action: 'webmunkExt.popup.loginRes' };
+//   private onAdPersonalizationModuleEvent(event: string, data: any): void {
+//     this.eventService.track(event, data);
+//   }
 
-    try {
-      const userData = await this.firebaseAppService.login(prolificId);
-      response.data = userData;
-    } catch (error: any) {
-      response.error = error.message;
-    }
+//   private async login(prolificId: string): Promise<void> {
+//     const response: any = { action: 'webmunkExt.popup.loginRes' };
 
-    await chrome.runtime.sendMessage(response);
-  }
+//     try {
+//       const userData = await this.firebaseAppService.login(prolificId);
+//       response.data = userData;
+//     } catch (error: any) {
+//       response.error = error.message;
+//     }
 
-  private async onModuleEvent(event: string, data: any): Promise<void> {
-    if (await this.isExtensionHasToBeRemoved()) {
-      await this.showRemoveExtensionNotification();
-      return
-    };
+//     await chrome.runtime.sendMessage(response);
+//   }
 
-    if (event === Event.ADS_RATED) {
-      const url = (await getTabInfo()).url;
+//   private async onModuleEvent(event: string, data: any): Promise<void> {
+//     if (await this.isExtensionHasToBeRemoved()) {
+//       await this.showRemoveExtensionNotification();
+//       return
+//     };
 
-      url && await this.screenshotService.makeScreenshotAdsRated(new URL(url));
-    }
+//     if (event === Event.ADS_RATED) {
+//       const url = (await getTabInfo()).url;
 
-    await this.eventService.track(event, data);
-  }
+//       url && await this.screenshotService.makeScreenshotAdsRated(new URL(url));
+//     }
 
-  private async middleware(): Promise<void> {
-    if (!(await this.isUserExist())) return;
+//     await this.eventService.track(event, data);
+//   }
 
-    await this.checkAdPersonalization();
-    await this.domainService.trackExcludedDomains();
-    await this.surveyService.initSurveysIfNeeded();
-  }
+//   private async middleware(): Promise<void> {
+//     if (!(await this.isUserExist())) return;
 
-  private async onPopupMessage(request: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) {
-    if (request.action === 'webmunkExt.popup.loginReq') {
-      await this.login(request.prolificId);
-    } else if (request.action === 'webmunkExt.popup.successRegister') {
-      await this.handleSuccessfulRegistration();
-    } else if (request.action === 'page_action') {
-      await this.screenshotService.makeScreenshotIfNeeded(new URL(request.url));
-    }
-  }
+//     await this.checkAdPersonalization();
+//     await this.domainService.trackExcludedDomains();
+//     await this.surveyService.initSurveysIfNeeded();
+//   }
 
-  private async handleSuccessfulRegistration(): Promise<void> {
-    await this.surveyService.startWeekTiming();
-    await this.trackInstalledExtensions();
-    await this.trackProlificUserMapping();
-    await this.setUninstallUrl();
-  }
+//   private async onPopupMessage(request: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) {
+//     if (request.action === 'webmunkExt.popup.loginReq') {
+//       await this.login(request.prolificId);
+//     } else if (request.action === 'webmunkExt.popup.successRegister') {
+//       await this.handleSuccessfulRegistration();
+//     } else if (request.action === 'page_action') {
+//       await this.screenshotService.makeScreenshotIfNeeded(new URL(request.url));
+//     }
+//   }
 
-  private async setUninstallUrl(): Promise<void> {
-    const user = await this.firebaseAppService.getUser();
-    const prolificId = user.prolificId;
+//   private async handleSuccessfulRegistration(): Promise<void> {
+//     await this.surveyService.startWeekTiming();
+//     await this.trackInstalledExtensions();
+//     await this.trackProlificUserMapping();
+//     await this.setUninstallUrl();
+//   }
 
-    chrome.runtime.setUninstallURL(`${UNINSTALL_URL}?key=webmunk&userId=${prolificId}`);
-  }
+//   private async setUninstallUrl(): Promise<void> {
+//     const user = await this.firebaseAppService.getUser();
+//     const prolificId = user.prolificId;
 
-  private async isNeedToCheckAdPersonalization(): Promise<boolean> {
-    const personalizationConfigsResult = await chrome.storage.local.get('personalizationConfigs');
-    const personalizationConfigs = personalizationConfigsResult.personalizationConfigs || {};
-    const array: PersonalizationConfigItem[] = Object.entries(personalizationConfigs).map(([key, value]) => ({
-      key,
-      value: Boolean(value),
-    }));
+//     chrome.runtime.setUninstallURL(`${UNINSTALL_URL}?key=webmunk&userId=${prolificId}`);
+//   }
 
-    const specifiedItem = array.find((config) => config.key === UrlParameters.ONLY_INFORMATION);
+//   private async isNeedToCheckAdPersonalization(): Promise<boolean> {
+//     const personalizationConfigsResult = await chrome.storage.local.get('personalizationConfigs');
+//     const personalizationConfigs = personalizationConfigsResult.personalizationConfigs || {};
+//     const array: PersonalizationConfigItem[] = Object.entries(personalizationConfigs).map(([key, value]) => ({
+//       key,
+//       value: Boolean(value),
+//     }));
 
-    if (specifiedItem && specifiedItem.value) return true;
+//     const specifiedItem = array.find((config) => config.key === UrlParameters.ONLY_INFORMATION);
 
-    const adPersonalizationConfiguration = [
-      UrlParameters.FACEBOOK,
-      UrlParameters.GOOGLE_AND_YOUTUBE,
-      UrlParameters.AMAZON
-    ];
+//     if (specifiedItem && specifiedItem.value) return true;
 
-    const isAdPersonalizationConfiguration = array.some((config) => adPersonalizationConfiguration.includes(config.key as UrlParameters));
+//     const adPersonalizationConfiguration = [
+//       UrlParameters.FACEBOOK,
+//       UrlParameters.GOOGLE_AND_YOUTUBE,
+//       UrlParameters.AMAZON
+//     ];
 
-    return isAdPersonalizationConfiguration;
-  }
+//     const isAdPersonalizationConfiguration = array.some((config) => adPersonalizationConfiguration.includes(config.key as UrlParameters));
 
-  private async checkAdPersonalization(): Promise<void> {
-    if (this.isAdPersonalizationChecking) return;
-    this.isAdPersonalizationChecking = true;
+//     return isAdPersonalizationConfiguration;
+//   }
 
-    try {
-      const isNeedToCheck = await this.isNeedToCheckAdPersonalization();
-      if (!isNeedToCheck) return;
+//   private async checkAdPersonalization(): Promise<void> {
+//     if (this.isAdPersonalizationChecking) return;
+//     this.isAdPersonalizationChecking = true;
 
-      const { personalizationTime = 0 } = await chrome.storage.local.get('personalizationTime');
-      const delayBetweenAdPersonalization = Number(DELAY_BETWEEN_AD_PERSONALIZATION);
-      const currentDate = Date.now();
+//     try {
+//       const isNeedToCheck = await this.isNeedToCheckAdPersonalization();
+//       if (!isNeedToCheck) return;
 
-      if (currentDate < delayBetweenAdPersonalization + personalizationTime) return;
+//       const { personalizationTime = 0 } = await chrome.storage.local.get('personalizationTime');
+//       const delayBetweenAdPersonalization = Number(DELAY_BETWEEN_AD_PERSONALIZATION);
+//       const currentDate = Date.now();
 
-      const adPersonalizationResult = await chrome.storage.local.get('adPersonalization.items');
-      const adPersonalization: AdPersonalizationItem[] = adPersonalizationResult['adPersonalization.items'] || [];
+//       if (currentDate < delayBetweenAdPersonalization + personalizationTime) return;
 
-      const tabId = await getActiveTabId();
-      if (!tabId) return;
+//       const adPersonalizationResult = await chrome.storage.local.get('adPersonalization.items');
+//       const adPersonalization: AdPersonalizationItem[] = adPersonalizationResult['adPersonalization.items'] || [];
 
-      adPersonalization.forEach((item) => {
-        chrome.tabs.sendMessage(
-          tabId,
-          { action: 'webmunkExt.worker.notifyAdPersonalization', data: { key: item.key }},
-          { frameId: 0 }
-        );
-      });
+//       const tabId = await getActiveTabId();
+//       if (!tabId) return;
 
-      await chrome.storage.local.set({ personalizationTime: currentDate });
-    } finally {
-      this.isAdPersonalizationChecking = false;
-    }
-  }
+//       adPersonalization.forEach((item) => {
+//         chrome.tabs.sendMessage(
+//           tabId,
+//           { action: 'webmunkExt.worker.notifyAdPersonalization', data: { key: item.key }},
+//           { frameId: 0 }
+//         );
+//       });
 
-  private async isAllAdPersonalizationSettingsChecked(): Promise<boolean> {
-    const adPersonalizationResult = await chrome.storage.local.get('adPersonalization.items');
-    const adPersonalization: AdPersonalizationItem[] = adPersonalizationResult['adPersonalization.items'] || [];
+//       await chrome.storage.local.set({ personalizationTime: currentDate });
+//     } finally {
+//       this.isAdPersonalizationChecking = false;
+//     }
+//   }
 
-    const checkedAdPersonalizationResult = await chrome.storage.local.get('adPersonalization.checkedItems');
-    const checkedAdPersonalization = checkedAdPersonalizationResult['adPersonalization.checkedItems'] || {};
+//   private async isAllAdPersonalizationSettingsChecked(): Promise<boolean> {
+//     const adPersonalizationResult = await chrome.storage.local.get('adPersonalization.items');
+//     const adPersonalization: AdPersonalizationItem[] = adPersonalizationResult['adPersonalization.items'] || [];
 
-    return Object.keys(checkedAdPersonalization).length === adPersonalization.length;
-  }
+//     const checkedAdPersonalizationResult = await chrome.storage.local.get('adPersonalization.checkedItems');
+//     const checkedAdPersonalization = checkedAdPersonalizationResult['adPersonalization.checkedItems'] || {};
 
-  private async isExtensionHasToBeRemoved(): Promise<boolean> {
-    const completedSurveysResult = await chrome.storage.local.get('completedSurveys');
-    const completedSurveys = completedSurveysResult.completedSurveys || [];
-    const needToDisableSurveyLoading = await isNeedToDisableSurveyLoading();
+//     return Object.keys(checkedAdPersonalization).length === adPersonalization.length;
+//   }
 
-    if (needToDisableSurveyLoading && await this.surveyService.isWeekPassed()) {
-      return true;
-    } else if ((completedSurveys.length === 2 && await this.isAllAdPersonalizationSettingsChecked())) {
-      return true;
-    }
+//   private async isExtensionHasToBeRemoved(): Promise<boolean> {
+//     const completedSurveysResult = await chrome.storage.local.get('completedSurveys');
+//     const completedSurveys = completedSurveysResult.completedSurveys || [];
+//     const needToDisableSurveyLoading = await isNeedToDisableSurveyLoading();
 
-    return false;
-  }
+//     if (needToDisableSurveyLoading && await this.surveyService.isWeekPassed()) {
+//       return true;
+//     } else if ((completedSurveys.length === 2 && await this.isAllAdPersonalizationSettingsChecked())) {
+//       return true;
+//     }
 
-  private async showRemoveExtensionNotification(): Promise<void> {
-    const { removeModalShowed = 0 } = await chrome.storage.local.get('removeModalShowed');
-    const currentDate = Date.now();
-    const delayBetweenRemoveNotification = Number(DELAY_BETWEEN_REMOVE_NOTIFICATION);
+//     return false;
+//   }
 
-    if (currentDate - removeModalShowed < delayBetweenRemoveNotification) return;
+//   private async showRemoveExtensionNotification(): Promise<void> {
+//     const { removeModalShowed = 0 } = await chrome.storage.local.get('removeModalShowed');
+//     const currentDate = Date.now();
+//     const delayBetweenRemoveNotification = Number(DELAY_BETWEEN_REMOVE_NOTIFICATION);
 
-    const tabId = await getActiveTabId(true);
-    if (!tabId) return;
+//     if (currentDate - removeModalShowed < delayBetweenRemoveNotification) return;
 
-    try {
-      await this.notificationService.showNotification(tabId, NotificationText.REMOVE);
-      await chrome.storage.local.set({ removeModalShowed: currentDate });
-    } catch (error) {
-      console.error("Failed to show rate notification:", error);
-    }
-  }
+//     const tabId = await getActiveTabId(true);
+//     if (!tabId) return;
 
-  private async onUrlTracking(tabId: number, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab): Promise<void> {
-    if (await this.isExtensionHasToBeRemoved()) {
-      await this.showRemoveExtensionNotification();
-      return
-    };
+//     try {
+//       await this.notificationService.showNotification(tabId, NotificationText.REMOVE);
+//       await chrome.storage.local.set({ removeModalShowed: currentDate });
+//     } catch (error) {
+//       console.error("Failed to show rate notification:", error);
+//     }
+//   }
 
-    if (!tab || !tab.url || changeInfo.status !== 'complete' || !(await this.isUserExist())) return;
-    const observedUrl = new URL(tab.url);
+//   private async onUrlTracking(tabId: number, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab): Promise<void> {
+//     if (await this.isExtensionHasToBeRemoved()) {
+//       await this.showRemoveExtensionNotification();
+//       return
+//     };
 
-    await this.middleware();
-    await this.surveyService.isThisSurveyUrl(observedUrl);
+//     if (!tab || !tab.url || changeInfo.status !== 'complete' || !(await this.isUserExist())) return;
+//     const observedUrl = new URL(tab.url);
 
-    await this.trackUrlIfNeeded(observedUrl);
+//     await this.middleware();
+//     await this.surveyService.isThisSurveyUrl(observedUrl);
 
-    await this.screenshotService.makeScreenshotIfNeeded(observedUrl);
-  }
+//     await this.trackUrlIfNeeded(observedUrl);
 
-  private async trackUrlIfNeeded(url: URL): Promise<void> {
-    const isExcluded = await this.domainService.isNeedToExcludeSpecifiedDomain(url);
+//     await this.screenshotService.makeScreenshotIfNeeded(observedUrl);
+//   }
 
-    /**
-     * Check if the hostname is 'hbs.qualtrics.com'.
-     * This is needed because we exclude 'qualtrics.com',
-     * but the 'hbs' subdomain should be tracked.
-    */
-    const isSpecialCase = url.hostname === 'hbs.qualtrics.com';
+//   private async trackUrlIfNeeded(url: URL): Promise<void> {
+//     const isExcluded = await this.domainService.isNeedToExcludeSpecifiedDomain(url);
 
-    if (isExcluded && !isSpecialCase) {
-      await this.domainService.markExcludedDomainAsVisited(url.hostname);
-      return;
-    }
+//     /**
+//      * Check if the hostname is 'hbs.qualtrics.com'.
+//      * This is needed because we exclude 'qualtrics.com',
+//      * but the 'hbs' subdomain should be tracked.
+//     */
+//     const isSpecialCase = url.hostname === 'hbs.qualtrics.com';
 
-    await this.eventService.track(Event.URL_TRACKING, { url: url.href });
-  }
+//     if (isExcluded && !isSpecialCase) {
+//       await this.domainService.markExcludedDomainAsVisited(url.hostname);
+//       return;
+//     }
 
-  private async trackInstalledExtensions(): Promise<void> {
-    const extensions = await getInstalledExtensions();
+//     await this.eventService.track(Event.URL_TRACKING, { url: url.href });
+//   }
 
-    await this.eventService.track(Event.INSTALLED_EXTENSIONS, { extensions });
-  }
+//   private async trackInstalledExtensions(): Promise<void> {
+//     const extensions = await getInstalledExtensions();
 
-  private async trackProlificUserMapping(): Promise<void> {
-    const user = await this.firebaseAppService.getUser();
+//     await this.eventService.track(Event.INSTALLED_EXTENSIONS, { extensions });
+//   }
 
-    await this.eventService.track(Event.USER_MAPPING, { prolificId: user.prolificId });
-  }
+//   private async trackProlificUserMapping(): Promise<void> {
+//     const user = await this.firebaseAppService.getUser();
 
-  private async isUserExist(): Promise<boolean> {
-    return !!(await this.firebaseAppService.getUser());
-  }
-}
+//     await this.eventService.track(Event.USER_MAPPING, { prolificId: user.prolificId });
+//   }
+
+//   private async isUserExist(): Promise<boolean> {
+//     return !!(await this.firebaseAppService.getUser());
+//   }
+// }
+console.log("[wm] worker entry");
+// do not import "./Worker"
