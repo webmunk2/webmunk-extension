@@ -4,4 +4,6 @@
 // import { Content } from './Content';
 
 // new Content().initialize();
-console.log('[wm] content loaded');
+console.log("[wm] content loaded");
+import "../modules/amazonRufusBlocker";
+
