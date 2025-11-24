@@ -1,8 +1,6 @@
 import TimeThrottler from './throttler.js';
 import webRequest from './traffic.js';
 // @ts-ignore
-import { RateService } from './RateService.ts';
-// @ts-ignore
 import filtersData from './url-filter.json';
 import cosmeticFilteringEngine from './cosmetic-filtering.js';
 import hostUrlFilters from './host-url-filter.json';
@@ -64,13 +62,11 @@ enum moduleEvents {
 export class ExtensionAdsWorker {
   private tabData: Record<number, TabData> = {};
   private throttler: TimeThrottler;
-  private rateService: RateService;
   private eventEmitter: any;
   private lastClickTime: number | null = null;
 
   constructor () {
     this.throttler = new TimeThrottler(1, 200);
-    this.rateService = new RateService();
     this.eventEmitter = (self as any).messenger.registerModule('ads-scraper');
   }
 
@@ -275,20 +271,6 @@ export class ExtensionAdsWorker {
     return { pageUrl: pageUrl, title, company, text, coordinates, initialUrl, redirected, redirectedUrl, content, adId };
   }
 
-  private async rateAdsIfNeeded(tabId: number): Promise<void> {
-    if (!this.tabData[tabId].ads.size) return;
-
-    setTimeout(async () => {
-      const response = await this.rateService.send(tabId);
-
-      if (!response) return;
-
-      const adIds = Array.from(this.tabData[tabId].ads.values()).map((ad) => ad.adId);
-
-      this.eventEmitter.emit(moduleEvents.ADS_RATED, { mark: response, adIds });
-    }, 1500);
-  }
-
   private sendAdsIfNeeded(tabId: number): void {
     if (!this.tabData[tabId].ads.size) return;
 
@@ -334,7 +316,6 @@ export class ExtensionAdsWorker {
 
         // console.log(`%cReceiving ad from tab ${tabId} - ${tabUrl}, ads detected: ${this.tabData[tabId].ads.size}`, 'color: green; font-weight: bold');
         // console.log('Tab data:', this.tabData[tabId]);
-        this.rateAdsIfNeeded(tabId);
         this.sendAdsIfNeeded(tabId);
       }
     }

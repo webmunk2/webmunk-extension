@@ -2,8 +2,8 @@
 // @ts-ignore
 import { messenger } from '@webmunk/utils';
 import { NotificationService } from './NotificationService';
-import { AdPersonalizationItem, PersonalizationConfigItem } from '../types';
-import { DELAY_BETWEEN_REMOVE_NOTIFICATION, DELAY_BETWEEN_AD_PERSONALIZATION, UNINSTALL_URL } from '../config';
+import { AdPersonalizationItem, PersonalizationConfigItem, AdPersonalizationAttempts } from '../types';
+import { DELAY_BETWEEN_REMOVE_NOTIFICATION, DELAY_BETWEEN_AD_PERSONALIZATION, UNINSTALL_URL, MAX_AD_PERSONALIZATION_RETRY_ATTEMPTS, AD_PERSONALIZATION_RETRY_INTERVAL } from '../config';
 import { EventService } from './EventService';
 import { FirebaseAppService } from './FirebaseAppService';
 import { ConfigService } from './ConfigService';
@@ -12,7 +12,8 @@ import { SurveyService } from './SurveyService';
 import { ScreenshotService } from './ScreenshotService';
 import XMLHttpRequest from 'xhr-shim';
 import { NotificationText, UrlParameters, Event, ExcludedDomains } from '../enums';
-import { getActiveTabId, getInstalledExtensions, isNeedToDisableSurveyLoading, getTabInfo } from './utils';
+import { getActiveTabId, getInstalledExtensions, isNeedToDisableSurveyLoading } from './utils';
+import { RateService } from './RateService';
 
 // this is where you could import your webmunk modules worker scripts
 import "@webmunk/extension-ads/worker";
@@ -35,6 +36,7 @@ export class Worker {
   private readonly surveyService: SurveyService;
   private readonly domainService: DomainService;
   private readonly screenshotService: ScreenshotService;
+  private readonly rateService: RateService;
   private isAdPersonalizationChecking: boolean = false;
 
   constructor() {
@@ -44,7 +46,8 @@ export class Worker {
     this.notificationService = new NotificationService();
     this.surveyService = new SurveyService(this.firebaseAppService, this.notificationService, this.eventService);
     this.domainService = new DomainService(this.configService, this.eventService);
-    this.screenshotService = new ScreenshotService(this.eventService, this.domainService, this.firebaseAppService);
+    this.rateService = new RateService(this.eventService);
+    this.screenshotService = new ScreenshotService(this.eventService, this.domainService, this.firebaseAppService, this.configService, this.rateService);
   }
 
   public async initialize(): Promise<void> {
@@ -61,8 +64,13 @@ export class Worker {
     chrome.tabs.onUpdated.addListener(this.onUrlTracking.bind(this));
   }
 
-  private onAdPersonalizationModuleEvent(event: string, data: any): void {
-    this.eventService.track(event, data);
+  private async onAdPersonalizationModuleEvent(event: string, data: any): Promise<void> {
+    if (data.closed) {
+      await this.incrementAdPersonalizationAttempt(data.key);
+      return;
+    }
+
+    await this.eventService.track(event, data);
   }
 
   private async login(prolificId: string): Promise<void> {
@@ -83,12 +91,6 @@ export class Worker {
       await this.showRemoveExtensionNotification();
       return
     };
-
-    if (event === Event.ADS_RATED) {
-      const url = (await getTabInfo()).url;
-
-      url && await this.screenshotService.makeScreenshotAdsRated(new URL(url));
-    }
 
     await this.eventService.track(event, data);
   }
@@ -151,36 +153,85 @@ export class Worker {
   private async checkAdPersonalization(): Promise<void> {
     if (this.isAdPersonalizationChecking) return;
     this.isAdPersonalizationChecking = true;
-
+  
     try {
       const isNeedToCheck = await this.isNeedToCheckAdPersonalization();
       if (!isNeedToCheck) return;
-
-      const { personalizationTime = 0 } = await chrome.storage.local.get('personalizationTime');
-      const delayBetweenAdPersonalization = Number(DELAY_BETWEEN_AD_PERSONALIZATION);
-      const currentDate = Date.now();
-
-      if (currentDate < delayBetweenAdPersonalization + personalizationTime) return;
-
-      const adPersonalizationResult = await chrome.storage.local.get('adPersonalization.items');
-      const adPersonalization: AdPersonalizationItem[] = adPersonalizationResult['adPersonalization.items'] || [];
-
-      const tabId = await getActiveTabId();
-      if (!tabId) return;
-
-      adPersonalization.forEach((item) => {
-        chrome.tabs.sendMessage(
-          tabId,
-          { action: 'webmunkExt.worker.notifyAdPersonalization', data: { key: item.key }},
-          { frameId: 0 }
-        );
-      });
-
-      await chrome.storage.local.set({ personalizationTime: currentDate });
+  
+      const isLimitActive = await this.shouldLimitAdPersonalization();
+  
+      if (!isLimitActive) {
+        await this.sendAdPersonalizationWithoutLimit();
+      } else {
+        await this.sendAdPersonalizationWithLimit();
+      }
     } finally {
       this.isAdPersonalizationChecking = false;
     }
   }
+
+  private async sendAdPersonalizationWithoutLimit(): Promise<void> {
+    const { personalizationTime = 0 } = await chrome.storage.local.get('personalizationTime');
+    const delayBetweenAdPersonalization = Number(DELAY_BETWEEN_AD_PERSONALIZATION);
+    const currentDate = Date.now();
+  
+    if (currentDate < delayBetweenAdPersonalization + personalizationTime) return;
+  
+    const adPersonalizationResult = await chrome.storage.local.get('adPersonalization.items');
+    const adPersonalization: AdPersonalizationItem[] = adPersonalizationResult['adPersonalization.items'] || [];
+    const tabId = await getActiveTabId();
+    if (!tabId) return;
+  
+    adPersonalization.forEach((item) => {
+      chrome.tabs.sendMessage(
+        tabId,
+        { action: 'webmunkExt.worker.notifyAdPersonalization', data: { key: item.key, isNeedToLimit: false } },
+        { frameId: 0 }
+      );
+    });
+  
+    await chrome.storage.local.set({ personalizationTime: currentDate });
+  }
+
+    private async sendAdPersonalizationWithLimit(): Promise<void> {
+      const { personalizationTime = 0 } = await chrome.storage.local.get('personalizationTime');
+      const currentDate = Date.now();
+      const retryInterval = Number(AD_PERSONALIZATION_RETRY_INTERVAL);
+    
+      if (currentDate < retryInterval + personalizationTime) return;
+    
+      const adPersonalizationResult = await chrome.storage.local.get('adPersonalization.items');
+      const adPersonalization: AdPersonalizationItem[] = adPersonalizationResult['adPersonalization.items'] || [];
+    
+      const tabId = await getActiveTabId();
+      if (!tabId) return;
+    
+      const attemptsResult = await chrome.storage.local.get('adPersonalizationAttempts');
+      const adPersonalizationAttempts: Record<string, AdPersonalizationAttempts> =
+        attemptsResult.adPersonalizationAttempts || {};
+    
+      const checkedResult = await chrome.storage.local.get('adPersonalization.checkedItems');
+      const checkedItems = checkedResult['adPersonalization.checkedItems'] || {};
+    
+      const itemsToCheck = adPersonalization.filter((item) => {
+        const attemptsInfo = adPersonalizationAttempts[item.key] || { attempts: 0 };
+        const isChecked = Boolean(checkedItems[item.key]);
+    
+        return !isChecked && attemptsInfo.attempts < Number(MAX_AD_PERSONALIZATION_RETRY_ATTEMPTS);
+      });
+    
+      if (itemsToCheck.length === 0) return;
+    
+      itemsToCheck.forEach((item) => {
+        chrome.tabs.sendMessage(
+          tabId,
+          { action: 'webmunkExt.worker.notifyAdPersonalization', data: { key: item.key, isNeedToLimit: true } },
+          { frameId: 0 }
+        );
+      });
+    
+      await chrome.storage.local.set({ personalizationTime: currentDate });
+    }
 
   private async isAllAdPersonalizationSettingsChecked(): Promise<boolean> {
     const adPersonalizationResult = await chrome.storage.local.get('adPersonalization.items');
@@ -196,13 +247,18 @@ export class Worker {
     const completedSurveysResult = await chrome.storage.local.get('completedSurveys');
     const completedSurveys = completedSurveysResult.completedSurveys || [];
     const needToDisableSurveyLoading = await isNeedToDisableSurveyLoading();
-
+  
     if (needToDisableSurveyLoading && await this.surveyService.isWeekPassed()) {
       return true;
-    } else if ((completedSurveys.length === 2 && await this.isAllAdPersonalizationSettingsChecked())) {
-      return true;
     }
+  
+    if (completedSurveys.length === 2) {
+      const allChecked = await this.isAllAdPersonalizationSettingsChecked();
+      const allUncheckedExceeded = await this.isAllUncheckedExceededAttempts();
 
+      if (allChecked || allUncheckedExceeded) return true;
+    }
+  
     return false;
   }
 
@@ -273,5 +329,47 @@ export class Worker {
 
   private async isUserExist(): Promise<boolean> {
     return !!(await this.firebaseAppService.getUser());
+  }
+
+  private async shouldLimitAdPersonalization(): Promise<boolean> {
+    const { completedSurveys = [] } = await chrome.storage.local.get('completedSurveys'); 
+    
+    return completedSurveys.length >= 2;
+  }
+
+  private async incrementAdPersonalizationAttempt(key: string): Promise<void> {
+    const storedData = await chrome.storage.local.get('adPersonalizationAttempts');
+    const adPersonalizationAttempts: Record<string, AdPersonalizationAttempts> = storedData.adPersonalizationAttempts || {};
+  
+    if (!adPersonalizationAttempts[key]) {
+      adPersonalizationAttempts[key] = { attempts: 1 };
+    } else {
+      adPersonalizationAttempts[key].attempts += 1;
+    }
+  
+    await chrome.storage.local.set({ adPersonalizationAttempts });
+  }
+
+  private async isAllUncheckedExceededAttempts(): Promise<boolean> {
+    const attemptsResult = await chrome.storage.local.get('adPersonalizationAttempts');
+    const attempts: Record<string, AdPersonalizationAttempts> =
+      attemptsResult.adPersonalizationAttempts || {};
+  
+    const itemsResult = await chrome.storage.local.get('adPersonalization.items');
+    const items: AdPersonalizationItem[] = itemsResult['adPersonalization.items'] || [];
+  
+    const checkedResult = await chrome.storage.local.get('adPersonalization.checkedItems');
+    const checked = checkedResult['adPersonalization.checkedItems'] || {};
+  
+    const uncheckedKeys = items
+      .map((item) => item.key)
+      .filter((key) => !checked[key]);
+  
+    if (uncheckedKeys.length === 0) return false;
+  
+    return uncheckedKeys.every((key) => {
+      const data = attempts[key];
+      return data && data.attempts >= Number(MAX_AD_PERSONALIZATION_RETRY_ATTEMPTS);
+    });
   }
 }

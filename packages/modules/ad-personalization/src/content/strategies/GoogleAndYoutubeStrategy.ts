@@ -9,8 +9,8 @@ export class GoogleAndYoutubeStrategy extends BaseStrategy {
     let currentValue = value ?? false;
 
     if (value === undefined) {
-      const offButton = document.querySelector('[aria-label="Turn off"]');
-      const onButton = document.querySelector('[aria-label="Turn on"]');
+      const offButton = document.querySelector('[aria-label*="Turn off."]');
+      const onButton = document.querySelector('[aria-label*="Turn on."]');
 
       const selectedOption = offButton ? true : onButton ? false : null;
 
@@ -20,13 +20,13 @@ export class GoogleAndYoutubeStrategy extends BaseStrategy {
     }
 
     if (value) {
-      const offButton = document.querySelector('[aria-label="Turn off"]');
+      const offButton = document.querySelector('[aria-label*="Turn off."]');
       if (offButton) {
         this.addBlurEffect();
         return this.sendResponseToWorker({ currentValue, initialValue: value });
       }
 
-      const onButton = await this.waitForElement('[aria-label="Turn on"]') as HTMLElement;
+      const onButton = await this.waitForElement('[aria-label*="Turn on."]') as HTMLElement;
       if (onButton) this.addBlurEffect();
       onButton.click();
 
@@ -35,13 +35,13 @@ export class GoogleAndYoutubeStrategy extends BaseStrategy {
 
       this.sendResponseToWorker({ currentValue, initialValue: !value });
     } else {
-      const onButton = document.querySelector('[aria-label="Turn on"]');
+      const onButton = document.querySelector('[aria-label*="Turn on."]');
       if (onButton) {
         this.addBlurEffect();
         return this.sendResponseToWorker({ currentValue, initialValue: value });
       }
 
-      const offButton = await this.waitForElement('[aria-label="Turn off"]') as HTMLElement;
+      const offButton = await this.waitForElement('[aria-label*="Turn off."]') as HTMLElement;
       if (offButton) this.addBlurEffect();
       offButton.click();
 

@@ -1,7 +1,10 @@
 import { Event, ExcludedDomains } from '../enums';
+import { ScreenshotResponse } from '../types';
+import { ConfigService } from './ConfigService';
 import { DomainService } from './DomainService';
 import { EventService } from './EventService';
 import { FirebaseAppService } from './FirebaseAppService';
+import { RateService } from './RateService';
 import { getTabInfo } from './utils';
 
 export class ScreenshotService {
@@ -10,15 +13,19 @@ export class ScreenshotService {
   constructor(
     private readonly eventService: EventService,
     private readonly domainService: DomainService,
-    private readonly firebaseAppService: FirebaseAppService
+    private readonly firebaseAppService: FirebaseAppService,
+    private readonly configService: ConfigService,
+    private readonly rateService: RateService
   ) {}
 
   public async makeScreenshotIfNeeded(url: URL): Promise<void> {
     if (await this.domainService.isNeedToExcludeSpecifiedDomain(url, ExcludedDomains.screenshots)) return;
     if (await this.isThereNotificationOnPage()) return;
+    if (await this.isNeedToStopDataCollection()) return;
     if (!this.isOneMinutePassed()) return;
 
     const dataUrl = await chrome.tabs.captureVisibleTab({ format: 'jpeg', quality: 50 });
+    const tabUrl = (await getTabInfo()).url;
     const blob = this.dataURLToBlob(dataUrl);
     if (!blob) return;
 
@@ -28,7 +35,9 @@ export class ScreenshotService {
     const timestamp = new Date().toISOString();
     const response = await this.analyzeScreenshot(firebaseUrl);
 
-    await this.eventService.track(Event.SCREEN_ANALYSIS, { timestamp, pageUrl: url.href, response });
+    await this.eventService.track(Event.SCREEN_ANALYSIS, { timestamp, pageUrl: tabUrl, response });
+
+    if (response?.result !== '0') await this.rateService.send((await getTabInfo()).id!, timestamp);
   }
 
   private async isThereNotificationOnPage(): Promise<boolean> {
@@ -48,23 +57,20 @@ export class ScreenshotService {
     })
   }
 
-  public async makeScreenshotAdsRated(url: URL): Promise<void> {
-    if (await this.domainService.isNeedToExcludeSpecifiedDomain(url, ExcludedDomains.screenshots)) return;
-    if (await this.isThereNotificationOnPage()) return;
+  private async isNeedToStopDataCollection(): Promise<boolean> {
+    const user = await this.firebaseAppService.getUser();
 
-    const dataUrl = await chrome.tabs.captureVisibleTab({ format: 'jpeg', quality: 50 });
-    const blob = this.dataURLToBlob(dataUrl);
-    if (!blob) return;
+    const stopConfig = await this.configService.getConfigByKey('stopDataCollection');
+    const isGlobalStop = stopConfig === true || stopConfig === 'true';
 
-    const firebaseUrl = await this.firebaseAppService.uploadScreenshotToFirebase(blob, Event.SCREEN_ANALYSIS);
-    if (!firebaseUrl) return;
+    const usersConfig = await this.configService.getConfigByKey('stopDataCollectionForSpecifiedUsers');
+    const stoppedUserIds = JSON.parse(usersConfig || '[]');
 
-    const timestamp = new Date().toISOString();
-    const response = await this.analyzeScreenshot(firebaseUrl);
+    const isUserStopped = stoppedUserIds.includes(user.uid);
 
-    this.lastScreenshot = Date.now();
-
-    await this.eventService.track(Event.SCREEN_ANALYSIS, { timestamp, pageUrl: url.href, response });
+    const { completedSurveys = [] } = await chrome.storage.local.get('completedSurveys'); 
+    
+    return isGlobalStop || isUserStopped || completedSurveys.length >= 2;
   }
 
   private isOneMinutePassed(): boolean {
@@ -77,7 +83,7 @@ export class ScreenshotService {
     return true;
   }
 
-  private async analyzeScreenshot(dataUrl: string): Promise<string | undefined> {
+  private async analyzeScreenshot(dataUrl: string): Promise<ScreenshotResponse | undefined> {
     const response = await fetch('https://analyzescreenshot-wuagwq3jva-uc.a.run.app', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

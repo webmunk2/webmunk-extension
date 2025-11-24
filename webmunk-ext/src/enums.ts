@@ -24,3 +24,8 @@ export enum ExcludedDomains {
   url_tracking = 'excludedUrlTrackingDomains',
   screenshots = 'excludedScreenshotsDomains'
 }
+
+export enum RateType {
+  relevance = 'relevance',
+  distraction = 'distraction'
+}
