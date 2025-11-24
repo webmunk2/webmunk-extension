@@ -1,23 +1,17 @@
-type RateResponses = {
-  relevance: string | null;
-  distraction: string | null;
-}
+import { RateType } from '../enums';
 
 export class RateService {
-  private responses: RateResponses;
-
   constructor() {
-    this.responses = { relevance: null, distraction: null };
     chrome.runtime.onMessage.addListener(this.handleMessage.bind(this));
   }
 
   private handleMessage(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void): void {
-    if (message.action === 'extensionAds.rateService.adRatingRequest') {
-      this.showAdRatingNotification();
+    if (message.action === 'webmunkExt.rateService.adRatingRequest') {
+      this.showAdRatingNotification(message.timestamp, message.type);
     }
   }
 
-  private showAdRatingNotification(): void {
+  private showAdRatingNotification(timestamp: string, type: RateType): void {
     if (document.getElementById('webmunk-rate-notification')) return;
 
     this.removeSurveyNotificationIfExist();
@@ -48,7 +42,7 @@ export class RateService {
         display: flex;
         flex-direction: column;
         gap: 15px;
-        width: 410px;
+        width: 450px;
         padding: 15px 20px;
 
         background-color: #ffffff;
@@ -128,8 +122,8 @@ export class RateService {
 
       .response-btn {
         padding: 10px 20px;
-        width: 70px;
         height: 35px;
+        max-width: 130px;
         display: flex;
         justify-content: center;
         align-items: center;
@@ -162,6 +156,7 @@ export class RateService {
 
     const notificationContainer = document.createElement('div');
     notificationContainer.classList.add('notification-container');
+    const answer = this.getAnswer(type);
 
     const notificationContent = `
       <div style="display: flex; align-items: center; justify-content: space-between;">
@@ -176,22 +171,11 @@ export class RateService {
           </path>
         </svg>
       </div>
-      <div style="display: flex; gap: 10px; flex-direction: column;">
-        <p style="font-size: 18px; color: black; margin: 0; line-height: 1.3;">Are these ads on this site relevant to you?</p>
-        <div class="response-buttons" style="display: flex; align-items: center; gap: 15px; justify-content: center;">
-          <button class="response-btn" data-question="relevance">Yes</button>
-          <button class="response-btn" data-question="relevance">No</button>
-        </div>
-      </div>
-      <div style="display: flex; gap: 10px; flex-direction: column;">
-        <p style="font-size: 18px; color: black; margin: 0; line-height: 1.3;"> Do the ads on this site distract you?</p>
-        <div class="response-buttons" style="display: flex; align-items: center; gap: 15px; justify-content: center;">
-          <button class="response-btn" data-question="distraction">Yes</button>
-          <button class="response-btn" data-question="distraction">No</button>
-        </div>
-      </div>
-      <div style="display: flex; justify-content: center; align-items: center; margin-top: 20px">
-        <button class="response-btn" style="width: 160px" data-absent>I don't see any ads</button>
+      <p style="font-size: 18px; color: black; margin: 0; line-height: 1.3;">How would you describe the ads on this site?</p>
+      <div class="response-buttons" style="display: flex; align-items: center; justify-content: space-between;">
+        <button class="response-btn">${answer}</button>
+        <button class="response-btn">Not ${answer}</button>
+        <button class="response-btn">No Ads Seen</button>
       </div>
     `;
     notificationContainer.innerHTML = notificationContent;
@@ -199,42 +183,30 @@ export class RateService {
     document.documentElement.appendChild(wrapper);
 
     document.getElementById('rate-close-button')!.addEventListener('click', () => {
-      this.sendResponseToService('skip');
+      this.sendResponseToService('skip', timestamp);
       wrapper.remove();
     });
 
     document.querySelectorAll('.response-btn').forEach((button) => {
       button.addEventListener('click', (event) => {
         const target = event.target as HTMLElement;
-
-        if (target.hasAttribute('data-absent')) {
-          wrapper.remove();
-          this.sendResponseToService('noAdsSeen');
-          return;
-         }
-
-        const question = target.dataset.question;
         const answer = target.textContent;
-
-        this.responses[question as keyof RateResponses] = answer;
-
-        document.querySelectorAll(`.response-btn[data-question="${question}"]`).forEach((btn) => {
-          btn.classList.remove('active');
-        });
 
         target.classList.add('active');
 
-        if (this.responses?.relevance && this.responses?.distraction) {
-          wrapper.remove();
-          this.sendResponseToService(this.responses);
-        }
+        wrapper.remove();
+        if (answer) this.sendResponseToService(answer, timestamp);
       });
     });
   }
 
-  private sendResponseToService(response: RateResponses | string): void {
+  private getAnswer(type: RateType): string {
+    return type === RateType.relevance ? 'Relevant' : 'Distracting';
+  }
+
+  private sendResponseToService(response: string, timestamp: string): void {
     chrome.runtime.sendMessage({
-      action: 'extensionAds.rateService.adRatingResponse',
+      action: `webmunkExt.rateService.adRatingResponse_${timestamp}`,
       response
     });
   }

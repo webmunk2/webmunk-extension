@@ -26,3 +26,11 @@ export type Extension = {
   homepageUrl?: string;
   enabled?: boolean;
 }
+
+export type ScreenshotResponse = {
+  result: string;
+}
+
+export type AdPersonalizationAttempts = {
+  attempts: number;
+}

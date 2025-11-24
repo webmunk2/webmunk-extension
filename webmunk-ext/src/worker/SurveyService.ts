@@ -3,7 +3,7 @@ import { ConfigService } from './ConfigService';
 import { WEBMUNK_URL } from '../config';
 import { NotificationService } from './NotificationService';
 import { NotificationText, UrlParameters } from '../enums';
-import { DELAY_BETWEEN_SURVEY, DELAY_BETWEEN_FILL_OUT_NOTIFICATION, DELAY_WHILE_AD_BLOCKER } from '../config';
+import { DELAY_BETWEEN_SURVEY, DELAY_BETWEEN_FILL_OUT_NOTIFICATION, DELAY_WHILE_AD_BLOCKER_OR_TO_SECOND_SURVEY } from '../config';
 import { EventService } from './EventService';
 import { getActiveTabId, isNeedToDisableSurveyLoading } from './utils';
 import { FirebaseAppService } from './FirebaseAppService';
@@ -16,6 +16,7 @@ enum events {
 export class SurveyService {
   private surveys: SurveyItem[] = [];
   private completedSurveys: SurveyItem[] = [];
+  private isLoadingSurvey = false;
   private readonly configService: ConfigService;
 
   constructor(
@@ -29,19 +30,32 @@ export class SurveyService {
 
   public async initSurveysIfNeeded(): Promise<void> {
     if (await isNeedToDisableSurveyLoading()) return;
-
+  
+    if (this.isLoadingSurvey) return;
+  
     if (this.surveys.length) {
       await this.showFillOutNotification();
       return;
     }
-
+  
     const isWeekPassed = await this.isWeekPassed();
     if (!isWeekPassed) return;
-
+  
     const tabId = await getActiveTabId();
     if (!tabId) return;
-
-    await this.loadSurveys();
+  
+    const { surveyLock = false } = await chrome.storage.local.get('surveyLock');
+    if (surveyLock) return;
+  
+    this.isLoadingSurvey = true;
+    await chrome.storage.local.set({ surveyLock: true });
+  
+    try {
+      await this.loadSurveys();
+    } finally {
+      this.isLoadingSurvey = false;
+      await chrome.storage.local.set({ surveyLock: false });
+    }
   }
 
   private async showFillOutNotification(): Promise<void> {
@@ -201,7 +215,7 @@ export class SurveyService {
       await chrome.storage.local.set({ surveys: this.surveys, completedSurveys: this.completedSurveys });
       await this.configurationManipulation(tab.url);
 
-      await this.startWeekTiming();
+      await this.startWeekTiming(true);
       await this.eventService.track(events.SURVEY_COMPLETED, { surveyUrl: openerTabUrl });
     }
   }
@@ -221,7 +235,7 @@ export class SurveyService {
     let delay: number;
 
     if (isAdBlockSituation) {
-      delay = Number(DELAY_WHILE_AD_BLOCKER);
+      delay = Number(DELAY_WHILE_AD_BLOCKER_OR_TO_SECOND_SURVEY);
     } else {
       delay = Number(DELAY_BETWEEN_SURVEY);
     }

@@ -7,25 +7,24 @@ interface Message {
 
 interface DataMessage {
   key: string;
+  isNeedToLimit: boolean;
+}
+interface ValuesResponse {
+  currentValue: boolean;
+  initialValue: boolean;
 }
 
 interface MessageResponse {
   response: {
-    values: {
-      currentValue: boolean;
-      initialValue: boolean;
-    };
+    values?: ValuesResponse;
     error?: string;
+    closed?: boolean;
   };
   tabId: number;
 }
 
 enum moduleEvents {
   AD_PERSONALIZATION = 'ad_personalization',
-}
-
-enum Url {
-  FACEBOOK = 'facebook.com'
 }
 
 export class AdPersonalizationWorker {
@@ -49,13 +48,13 @@ export class AdPersonalizationWorker {
   }
 
   private async handleCheckSettingsRequest(data: DataMessage) {
-    const { key } = data;
+    const { key, isNeedToLimit } = data;
     let url = await this.getAccordantUrl(key);
     let hasError = false;
     let lastError: string | undefined = undefined;
 
     while (url) {
-      const { response, tabId } = await this.send(key, url);
+      const { response, tabId } = await this.send(key, url, isNeedToLimit);
 
       if (response.error) {
         await this.removeWorkingUrl(key);
@@ -66,10 +65,21 @@ export class AdPersonalizationWorker {
         lastError = response.error;
         url = await this.getAccordantUrl(key, true);
       } else {
-        this.eventEmitter.emit(moduleEvents.AD_PERSONALIZATION, { key, url, values: response.values });
-        await this.addCheckedItem(key, response);
-        await chrome.tabs.remove(tabId);
+        let payload: any = {};
+        
+        if (response.values) {
+          payload.values = response.values;
+        } else if (response.closed !== undefined) {
+          payload.closed = response.closed;
+        }
 
+        this.eventEmitter.emit(moduleEvents.AD_PERSONALIZATION, { key, url, ...payload });
+
+        if (response.values) {
+          await this.addCheckedItem(key, response);
+        }  
+         
+        await chrome.tabs.remove(tabId);
         break;
       }
     }
@@ -175,7 +185,7 @@ export class AdPersonalizationWorker {
     return specifiedItem[key];
   }
 
-  private async send(key: string, url: string): Promise<MessageResponse> {
+  private async send(key: string, url: string, isNeedToLimit: boolean): Promise<MessageResponse> {
     const value = await this.getConfig(key);
 
     return new Promise((resolve, reject) => {
@@ -192,7 +202,12 @@ export class AdPersonalizationWorker {
         if (closedTabId !== createdTabId) return;
 
         removeListeners();
-        monitorTabListener();
+
+        if (isNeedToLimit) {
+          resolve({ response: { closed: true }, tabId: closedTabId });
+        } else {
+          monitorTabListener();
+        }
       };
 
       const monitorTabListener = () => {

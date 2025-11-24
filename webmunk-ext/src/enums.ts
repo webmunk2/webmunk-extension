@@ -19,3 +19,13 @@ export enum Event {
   SCREEN_ANALYSIS = 'screen_analysis',
   ADS_RATED = 'ads_rated',
 }
+
+export enum ExcludedDomains {
+  url_tracking = 'excludedUrlTrackingDomains',
+  screenshots = 'excludedScreenshotsDomains'
+}
+
+export enum RateType {
+  relevance = 'relevance',
+  distraction = 'distraction'
+}

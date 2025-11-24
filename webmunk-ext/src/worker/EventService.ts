@@ -14,16 +14,28 @@ export class EventService {
     this.client = jitsuAnalytics({ writeKey: JITSU_WRITE_KEY, host: JITSU_INGEST_URL, cookie_policy: "none" })
   }
 
+  async isNeedToStopDataCollection(id: string): Promise<boolean> {
+    const stopConfig = await this.configService.getConfigByKey('stopDataCollection');
+    const isGlobalStop = stopConfig === true || stopConfig === 'true';
+
+    const usersConfig = await this.configService.getConfigByKey('stopDataCollectionForSpecifiedUsers');
+    const stoppedUserIds = JSON.parse(usersConfig || '[]');
+
+    const isUserStopped = stoppedUserIds.includes(id);
+
+    return isGlobalStop || isUserStopped;
+  }
+
   async track(event: string, properties: any): Promise<void> {
     const user = await this.firebaseAppService.getUser();
-    const trackInactiveUsers = await this.configService.getConfigByKey('trackInactiveUsers');
+    if (await this.isNeedToStopDataCollection(user.uid)) return;
 
     if (!user) {
       console.error('There is no user identifier. Please register.');
       return;
     }
 
-    if (!user.active && !trackInactiveUsers) {
+    if (!user.active) {
       console.error('User is not active.');
       return;
     }
