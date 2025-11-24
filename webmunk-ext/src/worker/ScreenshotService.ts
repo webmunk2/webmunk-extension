@@ -68,7 +68,9 @@ export class ScreenshotService {
 
     const isUserStopped = stoppedUserIds.includes(user.uid);
 
-    return isGlobalStop || isUserStopped;
+    const { completedSurveys = [] } = await chrome.storage.local.get('completedSurveys'); 
+    
+    return isGlobalStop || isUserStopped || completedSurveys.length >= 2;
   }
 
   private isOneMinutePassed(): boolean {

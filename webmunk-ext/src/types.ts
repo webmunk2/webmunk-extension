@@ -31,7 +31,6 @@ export type ScreenshotResponse = {
   result: string;
 }
 
-export type RateResponses = {
-  relevance: string | null;
-  distraction: string | null;
+export type AdPersonalizationAttempts = {
+  attempts: number;
 }
