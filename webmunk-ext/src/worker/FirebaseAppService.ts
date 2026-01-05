@@ -2,7 +2,7 @@ import { initializeApp, type FirebaseOptions, type FirebaseApp } from 'firebase/
 import { getFirestore, doc, getDoc } from 'firebase/firestore';
 import { getAuth, signInAnonymously } from 'firebase/auth/web-extension';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { FIREBASE_CONFIG, USER_FETCH_INTERVAL, FIREBASE_BUCKET_URL } from '../config';
 import { User } from '../types';
 
@@ -114,6 +114,20 @@ export class FirebaseAppService {
       return downloadURL;
     } catch (error: any) {
       throw new Error(`Upload failed: ${error?.message}`);
+    }
+  }
+
+  public async deleteFile(firebaseUrl: string): Promise<void> {
+    try {
+      const match = firebaseUrl.match(/\/o\/(.*)\?alt=media/);
+      if (!match || !match[1]) throw new Error('Invalid Firebase Storage URL');
+  
+      const filePath = decodeURIComponent(match[1]);
+      const fileRef = ref(this.storage, filePath);
+  
+      await deleteObject(fileRef);
+    } catch (error: any) {
+      throw new Error(error?.message || 'Unknown error');
     }
   }
 }

@@ -3,7 +3,14 @@
 import { messenger } from '@webmunk/utils';
 import { NotificationService } from './NotificationService';
 import { AdPersonalizationItem, PersonalizationConfigItem, AdPersonalizationAttempts } from '../types';
-import { DELAY_BETWEEN_REMOVE_NOTIFICATION, DELAY_BETWEEN_AD_PERSONALIZATION, UNINSTALL_URL, MAX_AD_PERSONALIZATION_RETRY_ATTEMPTS, AD_PERSONALIZATION_RETRY_INTERVAL } from '../config';
+import { 
+  DELAY_BETWEEN_REMOVE_NOTIFICATION, 
+  DELAY_BETWEEN_AD_PERSONALIZATION, 
+  UNINSTALL_URL,
+  MAX_AD_PERSONALIZATION_RETRY_ATTEMPTS, 
+  AD_PERSONALIZATION_RETRY_INTERVAL,
+  AD_PERSONALIZATION_FIRST_AUTO_CHECK_DELAY
+  } from '../config';
 import { EventService } from './EventService';
 import { FirebaseAppService } from './FirebaseAppService';
 import { ConfigService } from './ConfigService';
@@ -98,9 +105,9 @@ export class Worker {
   private async middleware(): Promise<void> {
     if (!(await this.isUserExist())) return;
 
+    await this.surveyService.initSurveysIfNeeded();
     await this.checkAdPersonalization();
     await this.domainService.trackExcludedDomains();
-    await this.surveyService.initSurveysIfNeeded();
   }
 
   private async onPopupMessage(request: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) {
@@ -118,6 +125,7 @@ export class Worker {
     await this.trackInstalledExtensions();
     await this.trackProlificUserMapping();
     await this.setUninstallUrl();
+    await this.scheduleAdPersonalizationFirstAutoCheck();
   }
 
   private async setUninstallUrl(): Promise<void> {
@@ -155,6 +163,8 @@ export class Worker {
     this.isAdPersonalizationChecking = true;
   
     try {
+      await this.checkFirstAdPersonalizationAuto();
+
       const isNeedToCheck = await this.isNeedToCheckAdPersonalization();
       if (!isNeedToCheck) return;
   
@@ -171,67 +181,77 @@ export class Worker {
   }
 
   private async sendAdPersonalizationWithoutLimit(): Promise<void> {
-    const { personalizationTime = 0 } = await chrome.storage.local.get('personalizationTime');
     const delayBetweenAdPersonalization = Number(DELAY_BETWEEN_AD_PERSONALIZATION);
     const currentDate = Date.now();
+
+    chrome.storage.local.get(['personalizationTime', 'personalizationLock'], (storage) => {
+      const personalizationTime = storage.personalizationTime || 0;
+
+      if (currentDate < delayBetweenAdPersonalization + personalizationTime || storage.personalizationLock) return;
+
+      chrome.storage.local.set({ personalizationLock: true }, async () => {
+        try {
+          const adPersonalizationResult = await chrome.storage.local.get('adPersonalization.items');
+          const adPersonalization: AdPersonalizationItem[] = adPersonalizationResult['adPersonalization.items'] || [];
+
+          const tabId = await getActiveTabId();
+          if (!tabId) return;
+
+          adPersonalization.forEach((item) => {
+              chrome.tabs.sendMessage(
+                  tabId,
+                  { action: 'webmunkExt.worker.notifyAdPersonalization', data: { key: item.key, isNeedToLimit: false } },
+                  { frameId: 0 }
+              );
+          });
+
+          await chrome.storage.local.set({ personalizationTime: currentDate });
+        } finally {
+            chrome.storage.local.remove('personalizationLock');
+        }
+      });
+    });
+}
+
+  private async sendAdPersonalizationWithLimit(): Promise<void> {
+    const { personalizationTime = 0 } = await chrome.storage.local.get('personalizationTime');
+    const currentDate = Date.now();
+    const retryInterval = Number(AD_PERSONALIZATION_RETRY_INTERVAL);
   
-    if (currentDate < delayBetweenAdPersonalization + personalizationTime) return;
-  
+    if (currentDate < retryInterval + personalizationTime) return;
+
     const adPersonalizationResult = await chrome.storage.local.get('adPersonalization.items');
     const adPersonalization: AdPersonalizationItem[] = adPersonalizationResult['adPersonalization.items'] || [];
+  
     const tabId = await getActiveTabId();
     if (!tabId) return;
   
-    adPersonalization.forEach((item) => {
+    const attemptsResult = await chrome.storage.local.get('adPersonalizationAttempts');
+    const adPersonalizationAttempts: Record<string, AdPersonalizationAttempts> =
+      attemptsResult.adPersonalizationAttempts || {};
+  
+    const checkedResult = await chrome.storage.local.get('adPersonalization.checkedItems');
+    const checkedItems = checkedResult['adPersonalization.checkedItems'] || {};
+  
+    const itemsToCheck = adPersonalization.filter((item) => {
+      const attemptsInfo = adPersonalizationAttempts[item.key] || { attempts: 0 };
+      const isChecked = Boolean(checkedItems[item.key]);
+  
+      return !isChecked && attemptsInfo.attempts < Number(MAX_AD_PERSONALIZATION_RETRY_ATTEMPTS);
+    });
+  
+    if (itemsToCheck.length === 0) return;
+  
+    itemsToCheck.forEach((item) => {
       chrome.tabs.sendMessage(
         tabId,
-        { action: 'webmunkExt.worker.notifyAdPersonalization', data: { key: item.key, isNeedToLimit: false } },
+        { action: 'webmunkExt.worker.notifyAdPersonalization', data: { key: item.key, isNeedToLimit: true } },
         { frameId: 0 }
       );
     });
   
     await chrome.storage.local.set({ personalizationTime: currentDate });
   }
-
-    private async sendAdPersonalizationWithLimit(): Promise<void> {
-      const { personalizationTime = 0 } = await chrome.storage.local.get('personalizationTime');
-      const currentDate = Date.now();
-      const retryInterval = Number(AD_PERSONALIZATION_RETRY_INTERVAL);
-    
-      if (currentDate < retryInterval + personalizationTime) return;
-    
-      const adPersonalizationResult = await chrome.storage.local.get('adPersonalization.items');
-      const adPersonalization: AdPersonalizationItem[] = adPersonalizationResult['adPersonalization.items'] || [];
-    
-      const tabId = await getActiveTabId();
-      if (!tabId) return;
-    
-      const attemptsResult = await chrome.storage.local.get('adPersonalizationAttempts');
-      const adPersonalizationAttempts: Record<string, AdPersonalizationAttempts> =
-        attemptsResult.adPersonalizationAttempts || {};
-    
-      const checkedResult = await chrome.storage.local.get('adPersonalization.checkedItems');
-      const checkedItems = checkedResult['adPersonalization.checkedItems'] || {};
-    
-      const itemsToCheck = adPersonalization.filter((item) => {
-        const attemptsInfo = adPersonalizationAttempts[item.key] || { attempts: 0 };
-        const isChecked = Boolean(checkedItems[item.key]);
-    
-        return !isChecked && attemptsInfo.attempts < Number(MAX_AD_PERSONALIZATION_RETRY_ATTEMPTS);
-      });
-    
-      if (itemsToCheck.length === 0) return;
-    
-      itemsToCheck.forEach((item) => {
-        chrome.tabs.sendMessage(
-          tabId,
-          { action: 'webmunkExt.worker.notifyAdPersonalization', data: { key: item.key, isNeedToLimit: true } },
-          { frameId: 0 }
-        );
-      });
-    
-      await chrome.storage.local.set({ personalizationTime: currentDate });
-    }
 
   private async isAllAdPersonalizationSettingsChecked(): Promise<boolean> {
     const adPersonalizationResult = await chrome.storage.local.get('adPersonalization.items');
@@ -329,6 +349,36 @@ export class Worker {
 
   private async isUserExist(): Promise<boolean> {
     return !!(await this.firebaseAppService.getUser());
+  }
+
+  private async scheduleAdPersonalizationFirstAutoCheck(): Promise<void> {
+    const executeAt = Date.now() + Number(AD_PERSONALIZATION_FIRST_AUTO_CHECK_DELAY);
+  
+    await chrome.storage.local.set({ adPersonalizationAutoCheckAt: executeAt });
+  }
+
+  private async checkFirstAdPersonalizationAuto(): Promise<void> {
+    const { adPersonalizationAutoCheckAt } = await chrome.storage.local.get('adPersonalizationAutoCheckAt');
+    if (!adPersonalizationAutoCheckAt) return;
+
+    const currentDate = Date.now();
+    if (currentDate < adPersonalizationAutoCheckAt) return;
+
+    if (await isNeedToDisableSurveyLoading()) return;
+
+    const tabId = await getActiveTabId();
+    if (!tabId) return;
+    
+    await chrome.storage.local.remove('adPersonalizationAutoCheckAt');
+    const adPersonalizationKeys = ['fad', 'aap', 'gyta'];
+
+    adPersonalizationKeys.forEach((key) => {
+      chrome.tabs.sendMessage(
+        tabId,
+        { action: 'webmunkExt.worker.notifyAdPersonalization', data: { key, isNeedToLimit: false, isFirst: true } },
+        { frameId: 0 }
+      )
+    })
   }
 
   private async shouldLimitAdPersonalization(): Promise<boolean> {
