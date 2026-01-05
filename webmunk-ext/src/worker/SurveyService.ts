@@ -28,27 +28,39 @@ export class SurveyService {
     this.configService = new ConfigService(this.firebaseAppService);
   }
 
+  private async acquireSurveyLock(): Promise<boolean> {
+    const maxAttempts = 10;
+    const delay = 100;
+  
+    for (let i = 0; i < maxAttempts; i++) {
+      const { surveyLock = false } = await chrome.storage.local.get('surveyLock');
+      if (!surveyLock) {
+        await chrome.storage.local.set({ surveyLock: true });
+        return true;
+      }
+      await new Promise((res) => setTimeout(res, delay));
+    }
+
+    return false; 
+  }  
+
   public async initSurveysIfNeeded(): Promise<void> {
     if (await isNeedToDisableSurveyLoading()) return;
   
     if (this.isLoadingSurvey) return;
   
-    if (this.surveys.length) {
+    const { surveys = [] } = await chrome.storage.local.get('surveys');
+    if (surveys.length) {
       await this.showFillOutNotification();
       return;
     }
   
-    const isWeekPassed = await this.isWeekPassed();
-    if (!isWeekPassed) return;
+    if (!(await this.isWeekPassed())) return;
   
-    const tabId = await getActiveTabId();
-    if (!tabId) return;
-  
-    const { surveyLock = false } = await chrome.storage.local.get('surveyLock');
-    if (surveyLock) return;
+    const lockAcquired = await this.acquireSurveyLock();
+    if (!lockAcquired) return;
   
     this.isLoadingSurvey = true;
-    await chrome.storage.local.set({ surveyLock: true });
   
     try {
       await this.loadSurveys();

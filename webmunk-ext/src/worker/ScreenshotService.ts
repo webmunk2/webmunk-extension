@@ -38,6 +38,8 @@ export class ScreenshotService {
     await this.eventService.track(Event.SCREEN_ANALYSIS, { timestamp, pageUrl: tabUrl, response });
 
     if (response?.result !== '0') await this.rateService.send((await getTabInfo()).id!, timestamp);
+
+    await this.firebaseAppService.deleteFile(firebaseUrl);
   }
 
   private async isThereNotificationOnPage(): Promise<boolean> {

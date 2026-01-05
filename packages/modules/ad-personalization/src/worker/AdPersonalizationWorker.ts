@@ -8,6 +8,7 @@ interface Message {
 interface DataMessage {
   key: string;
   isNeedToLimit: boolean;
+  isFirst?: boolean;
 }
 interface ValuesResponse {
   currentValue: boolean;
@@ -48,13 +49,13 @@ export class AdPersonalizationWorker {
   }
 
   private async handleCheckSettingsRequest(data: DataMessage) {
-    const { key, isNeedToLimit } = data;
+    const { key, isNeedToLimit, isFirst } = data;
     let url = await this.getAccordantUrl(key);
     let hasError = false;
     let lastError: string | undefined = undefined;
 
     while (url) {
-      const { response, tabId } = await this.send(key, url, isNeedToLimit);
+      const { response, tabId } = await this.send(key, url, isNeedToLimit, isFirst);
 
       if (response.error) {
         await this.removeWorkingUrl(key);
@@ -131,24 +132,6 @@ export class AdPersonalizationWorker {
     }
   }
 
-  private async removeFromInvalidItems(key: string): Promise<void> {
-    const invalidItemsResult = await chrome.storage.local.get('adPersonalization.invalidItems');
-    const invalidItems = invalidItemsResult['adPersonalization.invalidItems'] || [];
-
-    const updatedInvalidItems = invalidItems.filter((item: { key: string; error: string }) => item.key !== key);
-
-    await chrome.storage.local.set({ 'adPersonalization.invalidItems': updatedInvalidItems });
-  }
-
-  private async addWorkingUrl(key: string, url: string): Promise<void> {
-    const storageData = await chrome.storage.local.get('adPersonalization.workingUrls');
-    const workingUrls = storageData['adPersonalization.workingUrls'] || {};
-
-    workingUrls[key] = url;
-
-    await chrome.storage.local.set({ 'adPersonalization.workingUrls': workingUrls });
-  }
-
   private async removeWorkingUrl(key: string): Promise<void> {
     const storageData = await chrome.storage.local.get('adPersonalization.workingUrls');
     const workingUrls = storageData['adPersonalization.workingUrls'] || {};
@@ -185,11 +168,12 @@ export class AdPersonalizationWorker {
     return specifiedItem[key];
   }
 
-  private async send(key: string, url: string, isNeedToLimit: boolean): Promise<MessageResponse> {
+  private async send(key: string, url: string, isNeedToLimit: boolean, isFirst?: boolean): Promise<MessageResponse> {
     const value = await this.getConfig(key);
 
     return new Promise((resolve, reject) => {
       let createdTabId: number | null = null;
+      let firstRetryDone = false;
 
       const messageListener = (message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
         if (message.action === 'adsPersonalization.strategies.settingsResponse' && sender.tab?.id === createdTabId) {
@@ -200,14 +184,22 @@ export class AdPersonalizationWorker {
 
       const tabCloseListener = (closedTabId: number) => {
         if (closedTabId !== createdTabId) return;
+        if (firstRetryDone) return;
 
         removeListeners();
 
+        if (isFirst && !firstRetryDone) {
+          firstRetryDone = true;
+          monitorTabListener();
+          return;
+        }
+
         if (isNeedToLimit) {
           resolve({ response: { closed: true }, tabId: closedTabId });
-        } else {
-          monitorTabListener();
+          return;
         }
+
+        monitorTabListener();
       };
 
       const monitorTabListener = () => {
