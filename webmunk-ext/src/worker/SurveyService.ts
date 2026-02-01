@@ -1,6 +1,6 @@
 import { SurveyItem } from '../types';
 import { ConfigService } from './ConfigService';
-import { WEBMUNK_URL } from '../config';
+import { WEBMUNK_LANDING_URL } from '../config';
 import { NotificationService } from './NotificationService';
 import { NotificationText, UrlParameters } from '../enums';
 import { DELAY_BETWEEN_SURVEY, DELAY_BETWEEN_FILL_OUT_NOTIFICATION, DELAY_WHILE_AD_BLOCKER_OR_TO_SECOND_SURVEY } from '../config';
@@ -130,12 +130,37 @@ export class SurveyService {
   }
 
   private async makeSearchParametersByAdsConfigs(): Promise<string | undefined> {
+    const checkedResult = await chrome.storage.local.get('adPersonalization.checkedItems');
+    const checkedItems = checkedResult['adPersonalization.checkedItems'] || {};
+
     const specifiedItemResult = await chrome.storage.local.get('personalizationConfigs');
     const specifiedItem = specifiedItemResult.personalizationConfigs || {};
 
-    if (!Object.keys(specifiedItem).length) return;
+    const adKeys: UrlParameters[] = [
+      UrlParameters.FACEBOOK,
+      UrlParameters.GOOGLE_AND_YOUTUBE,
+      UrlParameters.AMAZON,
+    ];
+    
+    const oiParam = UrlParameters.ONLY_INFORMATION in specifiedItem
+      ? [`${UrlParameters.ONLY_INFORMATION}=${specifiedItem[UrlParameters.ONLY_INFORMATION]}`]
+      : [];
 
-    const result = Object.entries(specifiedItem)
+    const paramsFromCheckedItems = adKeys
+      .map((key) => {
+        const currentValue = checkedItems[key]?.values?.currentValue;
+  
+        if (typeof currentValue === 'boolean') return `${key}=${currentValue}`;
+  
+        return null;
+      })
+      .filter(Boolean);
+
+    const paramsFromSpecifiedItems = Object.entries(specifiedItem)
+      .filter(([key]) =>
+        key !== UrlParameters.ONLY_INFORMATION &&
+        !adKeys.includes(key as UrlParameters)
+      )
       .sort(([, valueA], [, valueB]) => {
         const isBooleanA = typeof valueA === 'boolean';
         const isBooleanB = typeof valueB === 'boolean';
@@ -144,10 +169,17 @@ export class SurveyService {
         if (!isBooleanA && isBooleanB) return 1;
         return 0;
       })
-      .map(([key, value]) => `${key}=${value}`)
-      .join('&');
+      .map(([key, value]) => `${key}=${value}`);
 
-    return `&${result}`;
+    const allParams = [
+      ...oiParam,
+      ...paramsFromCheckedItems,
+      ...paramsFromSpecifiedItems,
+    ];
+
+    if (!allParams.length) return;
+
+    return `&${allParams.join('&')}`;
   }
 
   private extractQueryParams(url: string): Record<string, boolean | string> {
@@ -197,13 +229,13 @@ export class SurveyService {
 
     if (!user) return
 
-    const baseUrl = new URL(WEBMUNK_URL).origin;
+    const baseUrl = new URL(WEBMUNK_LANDING_URL).origin;
 
     if (changeInfo.status !== 'complete' || !tab.url?.startsWith(baseUrl)) {
       return;
     }
 
-    if (tab.url?.startsWith(`${WEBMUNK_URL}?${UrlParameters.AD_BLOCKER}`)) {
+    if (tab.url?.startsWith(`${WEBMUNK_LANDING_URL}?${UrlParameters.AD_BLOCKER}`)) {
       await this.adBlockerManipulations(tab.url);
       return;
     }

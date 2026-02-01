@@ -9,7 +9,7 @@ import {
   UNINSTALL_URL,
   MAX_AD_PERSONALIZATION_RETRY_ATTEMPTS, 
   AD_PERSONALIZATION_RETRY_INTERVAL,
-  AD_PERSONALIZATION_FIRST_AUTO_CHECK_DELAY
+  WEBMUNK_URL
   } from '../config';
 import { EventService } from './EventService';
 import { FirebaseAppService } from './FirebaseAppService';
@@ -125,7 +125,7 @@ export class Worker {
     await this.trackInstalledExtensions();
     await this.trackProlificUserMapping();
     await this.setUninstallUrl();
-    await this.scheduleAdPersonalizationFirstAutoCheck();
+    await this.checkFirstAdPersonalizationAuto();
   }
 
   private async setUninstallUrl(): Promise<void> {
@@ -163,8 +163,6 @@ export class Worker {
     this.isAdPersonalizationChecking = true;
   
     try {
-      await this.checkFirstAdPersonalizationAuto();
-
       const isNeedToCheck = await this.isNeedToCheckAdPersonalization();
       if (!isNeedToCheck) return;
   
@@ -351,24 +349,28 @@ export class Worker {
     return !!(await this.firebaseAppService.getUser());
   }
 
-  private async scheduleAdPersonalizationFirstAutoCheck(): Promise<void> {
-    const executeAt = Date.now() + Number(AD_PERSONALIZATION_FIRST_AUTO_CHECK_DELAY);
-  
-    await chrome.storage.local.set({ adPersonalizationAutoCheckAt: executeAt });
-  }
-
   private async checkFirstAdPersonalizationAuto(): Promise<void> {
-    const { adPersonalizationAutoCheckAt } = await chrome.storage.local.get('adPersonalizationAutoCheckAt');
-    if (!adPersonalizationAutoCheckAt) return;
-
-    const currentDate = Date.now();
-    if (currentDate < adPersonalizationAutoCheckAt) return;
-
     if (await isNeedToDisableSurveyLoading()) return;
 
-    const tabId = await getActiveTabId();
+    const tab = await chrome.tabs.create({ 
+        url: String(WEBMUNK_URL), 
+        active: true 
+    });
+
+    const tabId = tab.id || 0;
     if (!tabId) return;
-    
+        
+    await new Promise<void>((resolve) => {
+      const listener = (updatedTabId: number, info: chrome.tabs.TabChangeInfo) => {
+          if (updatedTabId === tabId && info.status === 'complete') {
+              chrome.tabs.onUpdated.removeListener(listener);
+              resolve();
+          }
+      };
+      
+      chrome.tabs.onUpdated.addListener(listener);
+    });
+
     await chrome.storage.local.remove('adPersonalizationAutoCheckAt');
     const adPersonalizationKeys = ['fad', 'aap', 'gyta'];
 
