@@ -109,6 +109,10 @@ export class SurveyService {
 
     if (nextSurveyIndex < surveys.length) {
       const surveyData = surveys[nextSurveyIndex];
+
+      const isReady = await this.isReadyForNextSurvey(surveyData.name);
+      if (!isReady) return;
+
       const newSurvey: SurveyItem = {
         name: surveyData.name,
         url: `${surveyData.url}?PROLIFIC_PID=${prolificId}${additionalParams || ''}`,
@@ -252,7 +256,11 @@ export class SurveyService {
       if (this.completedSurveys.some((completedSurvey) => completedSurvey.url === openerTabUrl)) return;
 
       const completedSurvey = this.surveys.find((survey) => survey.url === openerTabUrl);
-      if (completedSurvey) this.completedSurveys.push(completedSurvey);
+      if (completedSurvey) {
+        this.completedSurveys.push(completedSurvey);
+
+        if (completedSurvey.name === 'Survey 1') await chrome.storage.local.set({ survey1CompletedAt: Date.now() });
+      };
 
       this.surveys = this.surveys.filter((survey) => survey.url !== openerTabUrl);
 
@@ -310,5 +318,25 @@ export class SurveyService {
     if (!tabId) return;
 
     await chrome.tabs.sendMessage(tabId, { action: 'webmunkExt.worker.notifyCookiesModule' }, { frameId: 0 });
+  }
+
+  private async isReadyForNextSurvey(surveyName: string): Promise<boolean> {
+    if (surveyName !== 'Survey 2') return true;
+  
+    const { completedSurveys = [], survey1CompletedAt } = await chrome.storage.local.get([
+      'completedSurveys',
+      'survey1CompletedAt'
+    ]);
+
+    const firstSurveyCompleted = completedSurveys.find((s: SurveyItem) => s.name === 'Survey 1');
+    if (!firstSurveyCompleted || !survey1CompletedAt) return false;
+  
+    const currentTime = Date.now();
+    const minDelay = Number(DELAY_WHILE_AD_BLOCKER_OR_TO_SECOND_SURVEY);
+    const timeSinceCompletion = currentTime - survey1CompletedAt;
+  
+    if (timeSinceCompletion < minDelay) return false;
+
+    return true;
   }
 }
