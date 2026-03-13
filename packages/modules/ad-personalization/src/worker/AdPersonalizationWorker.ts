@@ -229,14 +229,16 @@ export class AdPersonalizationWorker {
     return new Promise((resolve, reject) => {
       chrome.tabs.create({ url, active: true }, (tab) => {
         if (tab && tab.id) {
-          chrome.tabs.onUpdated.addListener(function tabUpdateListener(tabId, changeInfo) {
+          const tabUpdateListener = (tabId: number, changeInfo: chrome.tabs.TabChangeInfo) => {
             if (tabId === tab.id && changeInfo.status === 'complete') {
+              chrome.tabs.onUpdated.removeListener(tabUpdateListener);
               chrome.tabs.sendMessage(tab.id, {
                 action: 'adsPersonalization.strategies.settingsRequest',
                 data: { key, value, url },
-              });
+              }, { frameId: 0 });
             }
-          });
+          };
+          chrome.tabs.onUpdated.addListener(tabUpdateListener);
           resolve(tab.id);
         } else {
           reject(new Error('Failed to create tab'));
