@@ -15,9 +15,17 @@ export class AdPersonalizationContent {
 
   private handleMessage(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void): void {
     if (message.action === 'adsPersonalization.strategies.settingsRequest') {
+      if (!this.isValidTargetUrl(message.data?.url)) return;
+      
       this.handleKey(message.data);
     }
   };
+
+  private isValidTargetUrl(url?: string): boolean {
+    if (!url) return true;
+
+    return window.location.href.startsWith(url);
+  }
 
   private handleKey(data: PersonalizationData): void {
     const strategy = this.strategyFactory.getStrategy(data.key);

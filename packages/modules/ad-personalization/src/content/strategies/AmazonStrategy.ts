@@ -6,6 +6,13 @@ export class AmazonStrategy extends BaseStrategy {
   public strategyKey = 'aap';
 
   async execute(data: PersonalizationData) {
+    const currentUrl = new URL(window.location.href);
+    
+    const isAmazonAdPrefs =
+      currentUrl.hostname === 'www.amazon.com' &&
+      currentUrl.pathname.startsWith('/adprefs');
+    if (!isAmazonAdPrefs) return;
+
     const { value } = data;
     let currentValue = value ?? false;
 
