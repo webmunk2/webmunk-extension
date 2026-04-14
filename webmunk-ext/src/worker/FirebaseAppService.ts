@@ -46,11 +46,11 @@ export class FirebaseAppService {
 
       return this.user;
     } catch (e: any) {
-      if (e.code.includes('already-exists')) {
+      if (e.code?.includes('already-exists')) {
         throw new Error(e.message);
       }
 
-      console.log(e);
+      throw e;
     }
   }
 
