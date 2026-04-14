@@ -770,7 +770,7 @@ if ( typeof vAPI === 'object' && !vAPI.contentScript ) {
                   href: node.href
               }
           }).then(result => {
-              return result.data.urlIsAnAd;
+              return result?.data?.urlIsAnAd ?? false;
           });
           if (urlIsAnAd && !(node.style.display === "none")) {
               let parentFrameIsAnAd = false;
