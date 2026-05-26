@@ -31,7 +31,11 @@ export class ConfigService {
       try {
         const firebaseConfig = getRemoteConfig(this.firebaseAppService.getFirebaseApp());
         firebaseConfig.settings.minimumFetchIntervalMillis = Number(REMOTE_CONFIG_FETCH_INTERVAL);
-        await fetchAndActivate(firebaseConfig);
+        try {
+          await fetchAndActivate(firebaseConfig);
+        } catch (e) {
+          console.warn('Remote Config fetch failed, using cached values:', e);
+        }
 
         this.config = Object.assign(
           convertConfigValuesToPrimitives(getAll(firebaseConfig)),

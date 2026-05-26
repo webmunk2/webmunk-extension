@@ -19,7 +19,7 @@ import { SurveyService } from './SurveyService';
 import { ScreenshotService } from './ScreenshotService';
 import XMLHttpRequest from 'xhr-shim';
 import { NotificationText, UrlParameters, Event, ExcludedDomains } from '../enums';
-import { getActiveTabId, getInstalledExtensions, isNeedToDisableSurveyLoading } from './utils';
+import { getActiveTabId, getInstalledExtensions, isNeedToDisableSurveyLoading, sendTabMessage } from './utils';
 import { RateService } from './RateService';
 
 // this is where you could import your webmunk modules worker scripts
@@ -60,8 +60,12 @@ export class Worker {
   public async initialize(): Promise<void> {
     await this.firebaseAppService.login();
     await this.surveyService.initSurveysIfExists();
-    await this.domainService.initExcludedDomains(ExcludedDomains.url_tracking);
-    await this.domainService.initExcludedDomains(ExcludedDomains.screenshots);
+    try {
+      await this.domainService.initExcludedDomains(ExcludedDomains.url_tracking);
+      await this.domainService.initExcludedDomains(ExcludedDomains.screenshots);
+    } catch (e: any) {
+      await this.eventService.track(Event.EXTENSION_ERROR, { source: 'initExcludedDomains', message: e?.message });
+    }
 
     messenger.addReceiver('appMgr', this);
     messenger.addModuleListener('ads-scraper', this.onModuleEvent.bind(this));
@@ -196,11 +200,7 @@ export class Worker {
           if (!tabId) return;
 
           adPersonalization.forEach((item) => {
-              chrome.tabs.sendMessage(
-                  tabId,
-                  { action: 'webmunkExt.worker.notifyAdPersonalization', data: { key: item.key, isNeedToLimit: false } },
-                  { frameId: 0 }
-              );
+            sendTabMessage(tabId, { action: 'webmunkExt.worker.notifyAdPersonalization', data: { key: item.key, isNeedToLimit: false } }, { frameId: 0 });
           });
 
           await chrome.storage.local.set({ personalizationTime: currentDate });
@@ -241,11 +241,7 @@ export class Worker {
     if (itemsToCheck.length === 0) return;
   
     itemsToCheck.forEach((item) => {
-      chrome.tabs.sendMessage(
-        tabId,
-        { action: 'webmunkExt.worker.notifyAdPersonalization', data: { key: item.key, isNeedToLimit: true } },
-        { frameId: 0 }
-      );
+      sendTabMessage(tabId, { action: 'webmunkExt.worker.notifyAdPersonalization', data: { key: item.key, isNeedToLimit: true } }, { frameId: 0 });
     });
   
     await chrome.storage.local.set({ personalizationTime: currentDate });
@@ -375,11 +371,7 @@ export class Worker {
     const adPersonalizationKeys = ['fad', 'aap', 'gyta'];
 
     adPersonalizationKeys.forEach((key) => {
-      chrome.tabs.sendMessage(
-        tabId,
-        { action: 'webmunkExt.worker.notifyAdPersonalization', data: { key, isNeedToLimit: false, isFirst: true } },
-        { frameId: 0 }
-      )
+      sendTabMessage(tabId, { action: 'webmunkExt.worker.notifyAdPersonalization', data: { key, isNeedToLimit: false, isFirst: true } }, { frameId: 0 })
     })
   }
 

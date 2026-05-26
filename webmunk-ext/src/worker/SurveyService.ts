@@ -2,10 +2,10 @@ import { SurveyItem } from '../types';
 import { ConfigService } from './ConfigService';
 import { WEBMUNK_LANDING_URL } from '../config';
 import { NotificationService } from './NotificationService';
-import { NotificationText, UrlParameters } from '../enums';
+import { NotificationText, UrlParameters, Event } from '../enums';
 import { DELAY_BETWEEN_SURVEY, DELAY_BETWEEN_FILL_OUT_NOTIFICATION, DELAY_WHILE_AD_BLOCKER_OR_TO_SECOND_SURVEY } from '../config';
 import { EventService } from './EventService';
-import { getActiveTabId, isNeedToDisableSurveyLoading } from './utils';
+import { getActiveTabId, isNeedToDisableSurveyLoading, sendTabMessage } from './utils';
 import { FirebaseAppService } from './FirebaseAppService';
 
 enum events {
@@ -64,6 +64,8 @@ export class SurveyService {
   
     try {
       await this.loadSurveys();
+    } catch (e: any) {
+      await this.eventService.track(Event.EXTENSION_ERROR, { source: 'loadSurveys', message: e?.message });
     } finally {
       this.isLoadingSurvey = false;
       await chrome.storage.local.set({ surveyLock: false });
@@ -317,7 +319,7 @@ export class SurveyService {
     const tabId = await getActiveTabId();
     if (!tabId) return;
 
-    await chrome.tabs.sendMessage(tabId, { action: 'webmunkExt.worker.notifyCookiesModule' }, { frameId: 0 });
+    sendTabMessage(tabId, { action: 'webmunkExt.worker.notifyCookiesModule' }, { frameId: 0 });
   }
 
   private async isReadyForNextSurvey(surveyName: string): Promise<boolean> {

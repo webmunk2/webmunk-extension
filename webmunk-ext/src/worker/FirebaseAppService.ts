@@ -78,23 +78,20 @@ export class FirebaseAppService {
   private async fetchUser(prolificId: string): Promise<void> {
     if (!prolificId) return;
 
-    const fetchPromise: Promise<void> = new Promise(async (resolve, reject) => {
+    const fetchPromise: Promise<void> = new Promise(async (resolve) => {
       try {
         const userRef = doc(this.firestore, 'users', prolificId);
         const userSnap = await getDoc(userRef);
 
         if (userSnap.exists()) {
           this.user = userSnap.data() as unknown as User;
-          this.userFetchTimestamp = Date.now();
-        } else {
-          this.user = null;
         }
-
-        resolve();
       } catch (e: any) {
-        reject(e);
+        console.warn('Failed to fetch user from Firestore:', e);
       } finally {
+        this.userFetchTimestamp = Date.now();
         this.fetchPromise = null;
+        resolve();
       }
     });
 
