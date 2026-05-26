@@ -29,7 +29,7 @@
 
 if (
     self.browser instanceof Object &&
-    self.browser instanceof Element === false
+    (typeof Element === 'undefined' || self.browser instanceof Element === false)
 ) {
     self.chrome = self.browser;
 } else {

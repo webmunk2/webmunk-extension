@@ -18,6 +18,7 @@ export enum Event {
   USER_MAPPING = 'user_mapping',
   SCREEN_ANALYSIS = 'screen_analysis',
   ADS_RATED = 'ads_rated',
+  EXTENSION_ERROR = 'extension_error',
 }
 
 export enum ExcludedDomains {

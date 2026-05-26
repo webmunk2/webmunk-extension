@@ -28,11 +28,16 @@ export class EventService {
 
   async track(event: string, properties: any): Promise<void> {
     const user = await this.firebaseAppService.getUser();
-    if (await this.isNeedToStopDataCollection(user.uid)) return;
 
     if (!user) {
       console.error('There is no user identifier. Please register.');
       return;
+    }
+
+    try {
+      if (await this.isNeedToStopDataCollection(user.uid)) return;
+    } catch (e) {
+      console.warn('Failed to check data collection status:', e);
     }
 
     if (!user.active) {

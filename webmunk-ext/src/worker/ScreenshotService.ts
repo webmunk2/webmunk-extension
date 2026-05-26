@@ -62,6 +62,8 @@ export class ScreenshotService {
   private async isNeedToStopDataCollection(): Promise<boolean> {
     const user = await this.firebaseAppService.getUser();
 
+    if (!user) return true;
+
     const stopConfig = await this.configService.getConfigByKey('stopDataCollection');
     const isGlobalStop = stopConfig === true || stopConfig === 'true';
 
@@ -70,8 +72,8 @@ export class ScreenshotService {
 
     const isUserStopped = stoppedUserIds.includes(user.uid);
 
-    const { completedSurveys = [] } = await chrome.storage.local.get('completedSurveys'); 
-    
+    const { completedSurveys = [] } = await chrome.storage.local.get('completedSurveys');
+
     return isGlobalStop || isUserStopped || completedSurveys.length >= 2;
   }
 
