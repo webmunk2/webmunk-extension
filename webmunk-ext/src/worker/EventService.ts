@@ -34,7 +34,11 @@ export class EventService {
       return;
     }
 
-    if (await this.isNeedToStopDataCollection(user.uid)) return;
+    try {
+      if (await this.isNeedToStopDataCollection(user.uid)) return;
+    } catch (e) {
+      console.warn('Failed to check data collection status:', e);
+    }
 
     if (!user.active) {
       console.error('User is not active.');

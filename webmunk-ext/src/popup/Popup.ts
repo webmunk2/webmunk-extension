@@ -122,8 +122,9 @@ class Popup {
   }
 
   private async initSurveys(): Promise<void> {
-    const result = await chrome.storage.local.get('surveys');
+    const result = await chrome.storage.local.get(['surveys', 'completedSurveys']);
     const surveys: SurveyItem[] = result.surveys || [];
+    const completedSurveys: SurveyItem[] = result.completedSurveys || [];
     const taskList = document.getElementById('task-list') as HTMLElement;
     const tasksStatus = document.getElementById('tasks-status') as HTMLElement;
 
@@ -139,7 +140,13 @@ class Popup {
       taskList.appendChild(listItem);
     });
 
-    tasksStatus.textContent = surveys.length ? 'Please complete these tasks:' : 'All tasks are completed!';
+    if (surveys.length) {
+      tasksStatus.textContent = 'Please complete these tasks:';
+    } else if (completedSurveys.length >= 2) {
+      tasksStatus.textContent = 'All tasks are completed!';
+    } else {
+      tasksStatus.textContent = 'No current tasks. Tasks will appear here when ready.';
+    }
   }
 
   private async copyIdentifier(): Promise<void> {

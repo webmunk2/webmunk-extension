@@ -45,6 +45,13 @@ export const getInstalledExtensions = async (): Promise<Extension[]> => {
   }));
 }
 
+export const sendTabMessage = (tabId: number, message: any, options?: chrome.tabs.MessageSendOptions): void => {
+  const p = options
+    ? chrome.tabs.sendMessage(tabId, message, options)
+    : chrome.tabs.sendMessage(tabId, message);
+  Promise.resolve(p).catch(() => {});
+};
+
 export const getTabInfo = async (): Promise<chrome.tabs.Tab> => {
   return new Promise((resolve) => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {

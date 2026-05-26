@@ -1,3 +1,5 @@
+import { sendTabMessage } from './utils';
+
 export class NotificationService {
   constructor() {
     chrome.runtime.onMessage.addListener(this.handleMessage.bind(this));
@@ -33,11 +35,7 @@ export class NotificationService {
       chrome.runtime.onMessage.addListener(messageListener);
       chrome.tabs.onRemoved.addListener(tabCloseListener);
 
-      chrome.tabs.sendMessage(
-        tabId,
-        { action: 'webmunkExt.notificationService.extensionNotificationRequest', text },
-        { frameId: 0 }
-      );
+      sendTabMessage(tabId, { action: 'webmunkExt.notificationService.extensionNotificationRequest', text }, { frameId: 0 });
     });
   }
 }
