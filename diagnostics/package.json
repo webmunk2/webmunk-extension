@@ -1,0 +1,17 @@
+{
+  "name": "webmunk-diagnostics",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone tests replicating the webmunk extension's ad-personalization switching, for verifying whether switches actually take effect. Does not modify or require the extension.",
+  "scripts": {
+    "login": "node login.mjs",
+    "audit": "node audit.mjs",
+    "audit:logged-in": "node audit-logged-in.mjs",
+    "switch-test": "node switch-test.mjs",
+    "amazon-revert": "node amazon-revert-test.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.60.0"
+  }
+}
